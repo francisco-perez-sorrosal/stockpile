@@ -10,6 +10,10 @@ Project containing programming artifacts related to investment analysis and tool
 
 Stock ticker symbol lookup using Yahoo Finance. Converts company names to ticker symbols with zero external dependencies (uses only Python standard library). See `.claude/skills/ticker/` for implementation.
 
+### Stock Clusters
+
+Analyze S&P 500 stocks by return and volatility, clustering them with K-means to identify investment opportunities. Uses pandas, numpy, and scipy (all pre-installed). No `yfinance` dependency—fetches data directly from Yahoo Finance API. See `.claude/skills/stock-clusters/` for implementation.
+
 ## Structure
 
 ```
@@ -104,6 +108,6 @@ This skill requires `package-name` for [functionality].
 For local testing: `pip install package-name`
 ```
 
-All skills in this project use only Python standard library to ensure maximum compatibility.
+All skills in this project prefer pre-installed packages (pandas, numpy, scipy, matplotlib) and Python standard library for maximum compatibility.
 
 See `README.md` for the full list of pre-installed packages and detailed best practices.

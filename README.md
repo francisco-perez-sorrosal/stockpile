@@ -46,6 +46,36 @@ Search for tech companies with "Cloud" in their name
 
 See `.claude/skills/ticker/` for the complete implementation, including the SKILL.md definition, Python scripts, and Yahoo Finance API reference documentation.
 
+### Stock Clusters Skill
+
+The **stock-clusters** skill performs K-means clustering analysis on S&P 500 stocks based on returns and volatility. It demonstrates:
+
+- **Pre-installed packages only**: Uses pandas, numpy, scipy, and matplotlib (no yfinance dependency)
+- **Direct API access**: Fetches data from Yahoo Finance API without external libraries
+- **Flexible analysis**: Configurable lookback periods and cluster counts
+- **Visual insights**: Generates scatter plots showing risk/reward profiles
+- **Market cap segmentation**: Analyze all stocks, mega-cap only, or exclude mega-caps
+
+**Example usage:**
+
+Basic clustering analysis:
+```
+Analyze S&P 500 stocks and cluster them by performance
+Show me risk/reward clusters for the last year
+Cluster stocks based on returns and volatility
+```
+
+Customized analysis:
+```
+Cluster S&P 500 stocks into 5 groups based on 2-year performance
+Analyze mega-cap stocks only and identify the best cluster
+Show non-mega-cap stocks clustered by 6-month returns
+```
+
+The skill outputs cluster statistics (mean returns, volatility, stock counts) and saves visualization plots to disk, making it easy to identify investment opportunities across different risk profiles.
+
+See `.claude/skills/stock-clusters/` for the complete implementation, including the SKILL.md definition and Python clustering script.
+
 ## Skills vs MCP
 
 | Aspect | Skills | MCP Servers |

@@ -73,6 +73,63 @@ def fetch_sp500_tickers() -> list[str]:
     return tickers
 
 
+def fetch_nasdaq100_tickers() -> list[str]:
+    """Fetch NASDAQ-100 ticker symbols from Wikipedia."""
+    url = "https://en.wikipedia.org/wiki/NASDAQ-100"
+    request = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(request, timeout=30) as response:
+        html = _decode_response(response)
+
+    tables = pd.read_html(io.StringIO(html))
+    # NASDAQ-100 table has 'Ticker' column
+    for table in tables:
+        if 'Ticker' in table.columns:
+            tickers = table['Ticker'].values.tolist()
+            # Clean ticker symbols
+            tickers = [s.replace("\n", "").replace(".", "-").replace(" ", "") for s in tickers]
+            return tickers
+    return []
+
+
+def fetch_dowjones_tickers() -> list[str]:
+    """Fetch Dow Jones Industrial Average ticker symbols from Wikipedia."""
+    url = "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average"
+    request = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(request, timeout=30) as response:
+        html = _decode_response(response)
+
+    tables = pd.read_html(io.StringIO(html))
+    # Dow Jones table has 'Symbol' column
+    for table in tables:
+        if 'Symbol' in table.columns and len(table) < 35:  # Dow has 30 companies
+            tickers = table['Symbol'].values.tolist()
+            # Clean ticker symbols
+            tickers = [s.replace("\n", "").replace(".", "-").replace(" ", "") for s in tickers]
+            return tickers
+    return []
+
+
+def fetch_tickers(index: str = "sp500") -> list[str]:
+    """Fetch tickers from major market indexes.
+
+    Args:
+        index: Index name - 'sp500', 'nasdaq100', 'dow', or 'dowjones'
+
+    Returns:
+        List of ticker symbols
+    """
+    index = index.lower()
+
+    if index in ("sp500", "s&p500", "sp"):
+        return fetch_sp500_tickers()
+    elif index in ("nasdaq100", "nasdaq", "ndx"):
+        return fetch_nasdaq100_tickers()
+    elif index in ("dow", "dowjones", "djia"):
+        return fetch_dowjones_tickers()
+    else:
+        raise ValueError(f"Unknown index: {index}. Use 'sp500', 'nasdaq100', or 'dow'")
+
+
 def _fetch_with_retry(url: str, max_retries: int = MAX_RETRIES) -> dict | None:
     """Fetch URL with retry logic and exponential backoff."""
     for attempt in range(max_retries):
@@ -384,18 +441,41 @@ def main() -> int:
         type=int,
         help="Limit number of tickers to process (useful for testing)",
     )
+    parser.add_argument(
+        "--tickers", "-t",
+        help="Comma-separated list of ticker symbols (e.g., 'AAPL,MSFT,GOOGL')",
+    )
+    parser.add_argument(
+        "--index", "-i",
+        default="sp500",
+        help="Market index to analyze: 'sp500', 'nasdaq100', or 'dow' (default: sp500)",
+    )
 
     args = parser.parse_args()
     verbose = not args.quiet
 
-    # Fetch S&P 500 tickers
-    if verbose:
-        print("Fetching S&P 500 tickers...", file=sys.stderr)
-    tickers = fetch_sp500_tickers()
-    if args.limit:
-        tickers = tickers[:args.limit]
-    if verbose:
-        print(f"  Processing {len(tickers)} tickers", file=sys.stderr)
+    # Get tickers - either from user input or from index
+    if args.tickers:
+        # User provided custom tickers
+        tickers = [t.strip().upper() for t in args.tickers.split(",")]
+        if verbose:
+            print(f"Using custom tickers: {', '.join(tickers)}", file=sys.stderr)
+    else:
+        # Fetch from index
+        if verbose:
+            index_name = args.index.upper()
+            if args.index.lower() in ("nasdaq100", "nasdaq", "ndx"):
+                index_name = "NASDAQ-100"
+            elif args.index.lower() in ("dow", "dowjones", "djia"):
+                index_name = "Dow Jones"
+            elif args.index.lower() in ("sp500", "s&p500", "sp"):
+                index_name = "S&P 500"
+            print(f"Fetching {index_name} tickers...", file=sys.stderr)
+        tickers = fetch_tickers(args.index)
+        if args.limit:
+            tickers = tickers[:args.limit]
+        if verbose:
+            print(f"  Processing {len(tickers)} tickers", file=sys.stderr)
 
     # Download price data
     delay_max = args.delay * 3  # Max delay is 3x the min

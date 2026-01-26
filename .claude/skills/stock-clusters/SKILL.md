@@ -1,28 +1,34 @@
 ---
 name: stock-clusters
-description: Analyze stock returns and volatility, clustering them by performance to identify investment opportunities.
+description: Analyze stock tickers by return and volatility using K-means clustering. Use when exploring investment opportunities, identifying risk profiles, comparing market segments, finding high-performers, or analyzing portfolio positioning.
 ---
 
-Cluster stocks by annualized return and volatility using K-means to identify high-performers, stable assets, and outliers worth investigating.
+Cluster stocks by annualized return and volatility using K-means to identify high-performers, stable assets, and outliers worth investigating. Works with custom tickers or major market indexes (S&P 500, NASDAQ-100, Dow Jones).
 
 ## Quick Start
 
-Analyze S&P 500 stocks with default settings:
+Analyze specific stocks:
+
+```bash
+python scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,NVDA,META"
+```
+
+Analyze S&P 500 stocks (default):
 
 ```bash
 python scripts/stock_clusters.py
 ```
 
-Specify number of clusters:
+Analyze NASDAQ-100:
 
 ```bash
-python scripts/stock_clusters.py --clusters 5
+python scripts/stock_clusters.py --index nasdaq100
 ```
 
-Output an interactive HTML chart:
+Customize clusters and output:
 
 ```bash
-python scripts/stock_clusters.py --output clusters.html
+python scripts/stock_clusters.py --clusters 5 --output clusters.html
 ```
 
 ## Using in Claude
@@ -30,11 +36,15 @@ python scripts/stock_clusters.py --output clusters.html
 Ask Claude to analyze stock performance:
 
 ```
-cluster S&P 500 stocks by return and volatility
+cluster AAPL, MSFT, GOOGL, NVDA, META, NFLX, and IBM by return and volatility
 ```
 
 ```
-show me the highest performing stocks with low volatility
+analyze tech stocks and show me the highest performing ones with low volatility
+```
+
+```
+cluster NASDAQ-100 stocks by risk and return
 ```
 
 Claude will run the analysis, generate an interactive scatter plot, and help interpret the clusters.
@@ -43,7 +53,10 @@ Claude will run the analysis, generate an interactive scatter plot, and help int
 
 | Task | Command |
 |------|---------|
-| Default analysis (5 clusters) | `python scripts/stock_clusters.py` |
+| Analyze specific stocks | `python scripts/stock_clusters.py -t "AAPL,MSFT,GOOGL"` |
+| Analyze NASDAQ-100 | `python scripts/stock_clusters.py -i nasdaq100` |
+| Analyze Dow Jones | `python scripts/stock_clusters.py -i dow` |
+| Default analysis (S&P 500, 5 clusters) | `python scripts/stock_clusters.py` |
 | Custom cluster count | `python scripts/stock_clusters.py -k 7` |
 | Save interactive chart | `python scripts/stock_clusters.py -o chart.html` |
 | Show elbow curve | `python scripts/stock_clusters.py --elbow` |
@@ -60,7 +73,7 @@ python scripts/stock_clusters.py --clusters 5 --output analysis.html
 ```
 
 The script:
-1. Fetches S&P 500 tickers from Wikipedia
+1. Gets tickers from custom list, or fetches from index (S&P 500, NASDAQ-100, Dow Jones)
 2. Downloads 1 year of daily prices from Yahoo Finance
 3. Calculates annualized return and volatility for each stock
 4. Clusters stocks using K-means
@@ -91,7 +104,7 @@ The elbow point (where diminishing returns start) suggests the optimal k value.
 
 ### 4. Disambiguate Tickers
 
-If you need more information about a specific ticker found in the results, use the [ticker skill](/ticker):
+If you need more information about a specific ticker found in the results, use `/ticker`:
 
 ```bash
 python ../ticker/scripts/ticker.py --ticker NVDA
@@ -140,7 +153,11 @@ Plotly scatter plot with hover tooltips showing ticker details.
 
 ## Data Sources
 
-- **Ticker list**: Wikipedia S&P 500 constituents table
+- **Ticker lists**:
+  - Custom tickers via `--tickers` argument
+  - S&P 500 from Wikipedia (default)
+  - NASDAQ-100 from Wikipedia
+  - Dow Jones from Wikipedia
 - **Price data**: Yahoo Finance Chart API (1 year daily)
 
 ## Dependencies
@@ -158,10 +175,10 @@ The script uses Yahoo Finance API directly (no `yfinance` package needed).
 
 ## Limitations
 
-- S&P 500 only (other indices planned for future)
 - 1-year lookback period (fixed)
 - Stocks with insufficient price history are skipped
 - Yahoo Finance rate limits may affect large batch downloads
+- Index tickers are fetched from Wikipedia (may not be 100% up-to-date)
 
 ## Rate Limiting
 
@@ -175,5 +192,5 @@ See [reference.md](reference.md) for technical details on rate limiting mitigati
 
 ## See Also
 
-- [ticker skill](../ticker/SKILL.md) - Look up ticker details and disambiguate symbols
+- `/ticker` - Look up ticker details and disambiguate symbols
 - [reference.md](reference.md) - Technical details on Yahoo Finance API and clustering algorithm

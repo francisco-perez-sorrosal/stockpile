@@ -1,6 +1,6 @@
 ---
 name: ticker
-description: Look up stock market ticker symbols from company names from a reliable source (Y! Finance), with disambiguation and company details.
+description: Look up stock ticker symbols from company names using Yahoo Finance. Use when researching stocks, needing ticker symbols, validating tickers, or getting company details like sector and market cap.
 ---
 
 Look up stock ticker symbols by company name, validate existing tickers, and retrieve company details like sector, industry, and market cap.

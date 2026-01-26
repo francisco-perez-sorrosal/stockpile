@@ -12,7 +12,7 @@ Stock ticker symbol lookup using Yahoo Finance. Converts company names to ticker
 
 ### Stock Clusters
 
-Analyze S&P 500 stocks by return and volatility, clustering them with K-means to identify investment opportunities. Uses pandas, numpy, and scipy (all pre-installed). No `yfinance` dependency—fetches data directly from Yahoo Finance API. See `.claude/skills/stock-clusters/` for implementation.
+Analyze stocks by return and volatility, clustering them with K-means to identify investment opportunities. Works with custom tickers or major market indexes (S&P 500, NASDAQ-100, Dow Jones). Uses pandas, numpy, and scipy (all pre-installed). No `yfinance` dependency—fetches data directly from Yahoo Finance API. See `.claude/skills/stock-clusters/` for implementation.
 
 ## Structure
 

@@ -48,28 +48,28 @@ See `.claude/skills/ticker/` for the complete implementation, including the SKIL
 
 ### Stock Clusters Skill
 
-The **stock-clusters** skill performs K-means clustering analysis on S&P 500 stocks based on returns and volatility. It demonstrates:
+The **stock-clusters** skill performs K-means clustering analysis on stocks based on returns and volatility. It demonstrates:
 
 - **Pre-installed packages only**: Uses pandas, numpy, scipy, and matplotlib (no yfinance dependency)
 - **Direct API access**: Fetches data from Yahoo Finance API without external libraries
-- **Flexible analysis**: Configurable lookback periods and cluster counts
+- **Flexible ticker selection**: Use custom tickers or fetch from major indexes (S&P 500, NASDAQ-100, Dow Jones)
+- **Configurable analysis**: Adjustable cluster counts and lookback periods
 - **Visual insights**: Generates scatter plots showing risk/reward profiles
-- **Market cap segmentation**: Analyze all stocks, mega-cap only, or exclude mega-caps
 
 **Example usage:**
 
 Basic clustering analysis:
 ```
-Analyze S&P 500 stocks and cluster them by performance
-Show me risk/reward clusters for the last year
-Cluster stocks based on returns and volatility
+Cluster AAPL, MSFT, GOOGL, NVDA, and META by return and volatility
+Analyze tech stocks and show me risk/reward clusters
+Cluster NASDAQ-100 stocks by performance
 ```
 
 Customized analysis:
 ```
-Cluster S&P 500 stocks into 5 groups based on 2-year performance
-Analyze mega-cap stocks only and identify the best cluster
-Show non-mega-cap stocks clustered by 6-month returns
+Cluster S&P 500 stocks into 7 groups based on risk and return
+Analyze Dow Jones stocks and identify the best performers
+Show me high-return, low-volatility stocks from the NASDAQ-100
 ```
 
 The skill outputs cluster statistics (mean returns, volatility, stock counts) and saves visualization plots to disk, making it easy to identify investment opportunities across different risk profiles.

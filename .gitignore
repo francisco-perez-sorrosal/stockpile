@@ -56,3 +56,6 @@ htmlcov/
 tmp/
 *.tmp
 *.log
+
+# HTML
+*.html

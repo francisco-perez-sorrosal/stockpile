@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """Stock clustering by return and volatility using K-means.
 
-Analyzes S&P 500 stocks, calculating annualized return and volatility,
-then clusters them to identify investment opportunities.
+Clusters stocks by annualized return and volatility to identify
+investment opportunities. Requires ticker symbols as input.
 
-No yfinance dependency - uses Yahoo Finance API directly.
+Delegates ticker resolution and index fetching to the /ticker skill.
 """
 
 import argparse
-import gzip
-import io
 import json
 import random
+import subprocess
 import sys
 import time
 import urllib.error
@@ -19,15 +18,15 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timedelta
 from math import sqrt
+from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
 from scipy.cluster.vq import kmeans, vq
 
-# Yahoo Finance API
+# Yahoo Finance API for price data only
 CHART_URL = "https://query2.finance.yahoo.com/v8/finance/chart"
-SP500_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
 
 # Minimal browser-like headers - avoid Accept-Encoding to prevent gzip issues
 HEADERS = {
@@ -50,137 +49,94 @@ class StockMetrics(NamedTuple):
     cluster: int
 
 
-class TickerInfo(NamedTuple):
-    ticker: str
-    name: str
-    sector: str
+def _find_ticker_script() -> Path:
+    """Find the ticker.py script path."""
+    # Try relative to this script first
+    this_dir = Path(__file__).parent
+    ticker_script = this_dir.parent.parent / "ticker" / "scripts" / "ticker.py"
+    if ticker_script.exists():
+        return ticker_script
+
+    # Try ~/.claude/skills/ticker
+    home_ticker = Path.home() / ".claude" / "skills" / "ticker" / "scripts" / "ticker.py"
+    if home_ticker.exists():
+        return home_ticker
+
+    raise FileNotFoundError("ticker.py script not found. Install the ticker skill first.")
 
 
-def _decode_response(response) -> str:
-    """Decode HTTP response, handling gzip compression if present."""
-    data = response.read()
-    # Check if gzip compressed (magic bytes 1f 8b) - some servers may still gzip
-    if len(data) >= 2 and data[:2] == b"\x1f\x8b":
-        data = gzip.decompress(data)
-    return data.decode("utf-8")
+def fetch_ticker_info(tickers: list[str], verbose: bool = True) -> dict[str, dict]:
+    """Fetch company info for tickers using the ticker skill.
 
-
-def fetch_sp500_tickers() -> list[str]:
-    """Fetch S&P 500 ticker symbols from Wikipedia."""
-    # Need to fetch with headers to avoid 403
-    request = urllib.request.Request(SP500_URL, headers=HEADERS)
-    with urllib.request.urlopen(request, timeout=30) as response:
-        html = _decode_response(response)
-
-    tables = pd.read_html(io.StringIO(html))
-    tickers = tables[0]["Symbol"].values.tolist()
-    # Clean ticker symbols
-    tickers = [s.replace("\n", "").replace(".", "-").replace(" ", "") for s in tickers]
-    return tickers
-
-
-def fetch_nasdaq100_tickers() -> list[str]:
-    """Fetch NASDAQ-100 ticker symbols from Wikipedia."""
-    url = "https://en.wikipedia.org/wiki/NASDAQ-100"
-    request = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(request, timeout=30) as response:
-        html = _decode_response(response)
-
-    tables = pd.read_html(io.StringIO(html))
-    # NASDAQ-100 table has 'Ticker' column
-    for table in tables:
-        if 'Ticker' in table.columns:
-            tickers = table['Ticker'].values.tolist()
-            # Clean ticker symbols
-            tickers = [s.replace("\n", "").replace(".", "-").replace(" ", "") for s in tickers]
-            return tickers
-    return []
-
-
-def fetch_dowjones_tickers() -> list[str]:
-    """Fetch Dow Jones Industrial Average ticker symbols from Wikipedia."""
-    url = "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average"
-    request = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(request, timeout=30) as response:
-        html = _decode_response(response)
-
-    tables = pd.read_html(io.StringIO(html))
-    # Dow Jones table has 'Symbol' column
-    for table in tables:
-        if 'Symbol' in table.columns and len(table) < 35:  # Dow has 30 companies
-            tickers = table['Symbol'].values.tolist()
-            # Clean ticker symbols
-            tickers = [s.replace("\n", "").replace(".", "-").replace(" ", "") for s in tickers]
-            return tickers
-    return []
-
-
-def fetch_tickers(index: str = "sp500") -> list[str]:
-    """Fetch tickers from major market indexes.
-
-    Args:
-        index: Index name - 'sp500', 'nasdaq100', 'dow', or 'dowjones'
-
-    Returns:
-        List of ticker symbols
+    Returns dict of ticker -> {"name": str, "sector": str, "industry": str}
     """
-    index = index.lower()
-
-    if index in ("sp500", "s&p500", "sp"):
-        return fetch_sp500_tickers()
-    elif index in ("nasdaq100", "nasdaq", "ndx"):
-        return fetch_nasdaq100_tickers()
-    elif index in ("dow", "dowjones", "djia"):
-        return fetch_dowjones_tickers()
-    else:
-        raise ValueError(f"Unknown index: {index}. Use 'sp500', 'nasdaq100', or 'dow'")
-
-
-def fetch_ticker_info(ticker: str) -> TickerInfo:
-    """Fetch company name and sector from Yahoo Finance search API."""
-    # Use the search API which doesn't require authentication
-    params = urllib.parse.urlencode({"q": ticker, "quotesCount": 1, "newsCount": 0})
-    url = f"https://query2.finance.yahoo.com/v1/finance/search?{params}"
-    data = _fetch_with_retry(url)
-
-    name = ticker
-    sector = ""
-
-    if data:
-        quotes = data.get("quotes", [])
-        for quote in quotes:
-            if quote.get("symbol", "").upper() == ticker.upper():
-                name = quote.get("shortname") or quote.get("longname") or ticker
-                # Search API provides industry but not sector
-                sector = quote.get("industry", "")
-                break
-
-    return TickerInfo(ticker=ticker, name=name, sector=sector)
-
-
-def fetch_all_ticker_info(
-    tickers: list[str],
-    verbose: bool = True,
-    delay_min: float = REQUEST_DELAY_MIN,
-    delay_max: float = REQUEST_DELAY_MAX,
-) -> dict[str, TickerInfo]:
-    """Fetch company info for multiple tickers."""
-    info_map: dict[str, TickerInfo] = {}
+    if not tickers:
+        return {}
 
     if verbose:
-        print(f"Fetching company info for {len(tickers)} tickers...", file=sys.stderr)
+        print(f"Fetching info for {len(tickers)} tickers via ticker skill...", file=sys.stderr)
 
-    for i, ticker in enumerate(tickers):
-        if verbose and (i + 1) % 50 == 0:
-            print(f"  Fetching info {i + 1}/{len(tickers)}...", file=sys.stderr)
+    try:
+        ticker_script = _find_ticker_script()
+        result = subprocess.run(
+            [sys.executable, str(ticker_script), ",".join(tickers)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+        else:
+            print(f"Warning: ticker script failed: {result.stderr}", file=sys.stderr)
+    except FileNotFoundError:
+        print("Warning: ticker skill not found, skipping company info", file=sys.stderr)
+    except subprocess.TimeoutExpired:
+        print("Warning: ticker lookup timed out", file=sys.stderr)
+    except json.JSONDecodeError:
+        print("Warning: could not parse ticker response", file=sys.stderr)
 
-        info = fetch_ticker_info(ticker)
-        info_map[ticker] = info
+    # Return empty info on failure
+    return {t: {"name": t, "sector": "", "industry": ""} for t in tickers}
 
-        if i < len(tickers) - 1:
-            time.sleep(random.uniform(delay_min, delay_max))
 
-    return info_map
+def fetch_index_tickers(index: str, verbose: bool = True) -> tuple[list[str], dict[str, dict]]:
+    """Fetch tickers and info from a market index via the ticker skill.
+
+    Args:
+        index: Index name - 'sp500', 'nasdaq100', or 'dow'
+        verbose: Print progress messages
+
+    Returns:
+        Tuple of (list of ticker symbols, dict of ticker info)
+    """
+    if verbose:
+        print(f"Fetching {index} tickers via ticker skill...", file=sys.stderr)
+
+    try:
+        ticker_script = _find_ticker_script()
+        result = subprocess.run(
+            [sys.executable, str(ticker_script), "--index", index],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            # New format: dict of symbol -> info
+            tickers = list(data.keys())
+            if verbose:
+                print(f"  Retrieved {len(tickers)} tickers with info", file=sys.stderr)
+            return tickers, data
+        else:
+            print(f"Error: ticker script failed: {result.stderr}", file=sys.stderr)
+    except FileNotFoundError:
+        print("Error: ticker skill not found. Install it first.", file=sys.stderr)
+    except subprocess.TimeoutExpired:
+        print("Error: ticker lookup timed out", file=sys.stderr)
+    except json.JSONDecodeError:
+        print("Error: could not parse ticker response", file=sys.stderr)
+
+    return [], {}
 
 
 def _fetch_with_retry(url: str, max_retries: int = MAX_RETRIES) -> dict | None:
@@ -189,7 +145,7 @@ def _fetch_with_retry(url: str, max_retries: int = MAX_RETRIES) -> dict | None:
         try:
             request = urllib.request.Request(url, headers=HEADERS)
             with urllib.request.urlopen(request, timeout=15) as response:
-                return json.loads(_decode_response(response))
+                return json.loads(response.read().decode("utf-8"))
 
         except urllib.error.HTTPError as e:
             if e.code == 429 or "Too Many Requests" in str(e):
@@ -373,15 +329,15 @@ def label_clusters(clusters_df: pd.DataFrame) -> dict[int, str]:
 
 def enrich_clusters_with_info(
     clusters_df: pd.DataFrame,
-    ticker_info: dict[str, TickerInfo],
+    ticker_info: dict[str, dict],
     cluster_labels: dict[int, str],
 ) -> pd.DataFrame:
     """Add company info and cluster labels to clusters dataframe."""
     df = clusters_df.copy()
 
-    # Add company info
-    df["Name"] = df["Ticker"].apply(lambda t: ticker_info.get(t, TickerInfo(t, t, "Unknown")).name)
-    df["Sector"] = df["Ticker"].apply(lambda t: ticker_info.get(t, TickerInfo(t, t, "Unknown")).sector)
+    # Add company info from ticker skill results
+    df["Name"] = df["Ticker"].apply(lambda t: ticker_info.get(t, {}).get("name", t))
+    df["Sector"] = df["Ticker"].apply(lambda t: ticker_info.get(t, {}).get("sector", "") or ticker_info.get(t, {}).get("industry", ""))
 
     # Add cluster labels
     df["ClusterLabel"] = df["Cluster"].map(cluster_labels)
@@ -645,6 +601,9 @@ def main() -> int:
     args = parser.parse_args()
     verbose = not args.quiet
 
+    # Track ticker info from any source
+    ticker_info: dict[str, dict] = {}
+
     # Get tickers - either from user input or from index
     if args.tickers:
         # User provided custom tickers
@@ -652,17 +611,11 @@ def main() -> int:
         if verbose:
             print(f"Using custom tickers: {', '.join(tickers)}", file=sys.stderr)
     else:
-        # Fetch from index
-        if verbose:
-            index_name = args.index.upper()
-            if args.index.lower() in ("nasdaq100", "nasdaq", "ndx"):
-                index_name = "NASDAQ-100"
-            elif args.index.lower() in ("dow", "dowjones", "djia"):
-                index_name = "Dow Jones"
-            elif args.index.lower() in ("sp500", "s&p500", "sp"):
-                index_name = "S&P 500"
-            print(f"Fetching {index_name} tickers...", file=sys.stderr)
-        tickers = fetch_tickers(args.index)
+        # Fetch from index via ticker skill (returns tickers + info)
+        tickers, ticker_info = fetch_index_tickers(args.index, verbose=verbose)
+        if not tickers:
+            print("Error: Could not fetch index tickers", file=sys.stderr)
+            return 1
         if args.limit:
             tickers = tickers[:args.limit]
         if verbose:
@@ -711,16 +664,10 @@ def main() -> int:
     # Label clusters based on characteristics
     cluster_labels = label_clusters(clusters_df)
 
-    # Optionally fetch company info for richer output
-    ticker_info: dict[str, TickerInfo] = {}
-    if not args.no_info:
+    # Fetch company info if not already available (custom tickers case)
+    if not args.no_info and not ticker_info:
         successful_tickers = clusters_df["Ticker"].tolist()
-        ticker_info = fetch_all_ticker_info(
-            successful_tickers,
-            verbose=verbose,
-            delay_min=args.delay,
-            delay_max=delay_max,
-        )
+        ticker_info = fetch_ticker_info(successful_tickers, verbose=verbose)
 
     # Enrich clusters with labels and info
     clusters_df = enrich_clusters_with_info(clusters_df, ticker_info, cluster_labels)

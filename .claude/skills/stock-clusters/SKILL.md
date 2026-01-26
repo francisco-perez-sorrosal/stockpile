@@ -143,7 +143,7 @@ After the user has seen the plot, provide your interpretation:
 For deeper analysis of any ticker found in the results, use `/ticker`:
 
 ```bash
-python ../ticker/scripts/ticker.py --ticker NVDA --details
+python ../ticker/scripts/ticker.py "NVDA" --details
 ```
 
 This provides company name, sector, industry, and market cap.
@@ -196,11 +196,14 @@ Plotly scatter plot with hover tooltips showing ticker, company name, sector, an
 
 - **Ticker lists**: Custom input, or Wikipedia (S&P 500, NASDAQ-100, Dow Jones)
 - **Price data**: Yahoo Finance Chart API (1 year daily)
-- **Company info**: Yahoo Finance Search API
+- **Company info**: Via `/ticker` skill (batch lookup)
 
 ## Dependencies
 
-**Required** (pre-installed in Claude environments):
+**Skill dependency:**
+- `/ticker` - Required for company name/sector lookup
+
+**Python packages** (pre-installed in Claude environments):
 - `pandas`, `numpy`, `scipy`, `matplotlib`
 
 **Auto-installed** (for interactive charts):

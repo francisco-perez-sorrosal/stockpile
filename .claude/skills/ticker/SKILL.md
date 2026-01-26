@@ -34,6 +34,12 @@ python scripts/ticker.py "AAPL" --refresh-market
 
 # Refresh market data for ALL cached tickers
 python scripts/ticker.py --refresh-market
+
+# Calculate/refresh metrics (returns, volatility)
+python scripts/ticker.py "AAPL,MSFT" --refresh-metrics
+
+# Refresh metrics for ALL cached tickers
+python scripts/ticker.py --refresh-metrics
 ```
 
 ## Common Tasks
@@ -49,6 +55,8 @@ python scripts/ticker.py --refresh-market
 | Fresh data | `python scripts/ticker.py "AAPL" --no-cache` |
 | Refresh prices | `python scripts/ticker.py "AAPL" --refresh-market` |
 | Refresh all cached | `python scripts/ticker.py --refresh-market` |
+| Refresh metrics | `python scripts/ticker.py "AAPL" --refresh-metrics` |
+| Refresh all metrics | `python scripts/ticker.py --refresh-metrics` |
 
 ## Output Format
 
@@ -56,21 +64,25 @@ All outputs are dict of symbol → info:
 
 ```json
 {
-  "AAPL": {"name": "Apple Inc.", "sector": "Technology", "industry": "Consumer Electronics"},
-  "MSFT": {"name": "Microsoft Corporation", "sector": "Technology", "industry": "Software—Infrastructure"}
+  "AAPL": {"name": "Apple Inc.", "sector": "Technology", "industry": "Consumer Electronics", "returns": 0.127, "volatility": 0.320},
+  "MSFT": {"name": "Microsoft Corporation", "sector": "Technology", "industry": "Software—Infrastructure", "returns": 0.100, "volatility": 0.243}
 }
 ```
 
+Metrics fields (`returns`, `volatility`) appear after using `--refresh-metrics`.
+
 ## Cache
 
-Ticker info is cached to `~/.cache/ticker/tickers.json` with two refresh policies:
+Ticker info is cached to `~/.cache/ticker/tickers.json` with three refresh policies:
 
 **Static data** (name, sector, industry, exchange): Cached 30 days
 **Market data** (price, volume, day_high/low, week_52_high/low): Cached 24 hours
+**Metrics data** (returns, volatility): Cached 7 days
 
 - `--no-cache`: Bypass cache entirely, fetch all data fresh
 - `--refresh-market`: Keep static data from cache, refresh only market data
-- Cache stores complete ticker info for future calculations and database migration
+- `--refresh-metrics`: Fetch 1-year historical prices and calculate annualized return/volatility
+- Cache stores complete ticker info for use by other skills (e.g., `/stock-clusters`)
 
 ## Auto-Detection
 

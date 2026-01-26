@@ -11,6 +11,7 @@ Caches ticker info to ~/.cache/ticker/tickers.json for performance.
 import argparse
 import gzip
 import json
+import math
 import re
 import sys
 import urllib.request
@@ -38,17 +39,22 @@ HEADERS = {
 
 
 class TickerInfo:
-    """Stock ticker information with separate static and market data.
+    """Stock ticker information with separate static, market, and metrics data.
 
     Static fields (rarely change, cached 30 days):
         symbol, name, long_name, exchange, type, sector, industry, currency, first_trade_date
 
-    Market fields (change daily, cached until next trading day):
+    Market fields (change daily, cached 24 hours):
         price, previous_close, volume, day_high, day_low, week_52_high, week_52_low
+
+    Metrics fields (calculated from 1-year history, cached 7 days):
+        returns - annualized return (daily_mean * 252)
+        volatility - annualized volatility (daily_std * sqrt(252))
 
     Timestamps:
         updated_at - when static data was last fetched
         market_updated_at - when market data was last fetched
+        metrics_updated_at - when metrics were last calculated
     """
 
     STATIC_FIELDS = frozenset({
@@ -59,6 +65,10 @@ class TickerInfo:
     MARKET_FIELDS = frozenset({
         "price", "previous_close", "volume",
         "day_high", "day_low", "week_52_high", "week_52_low",
+    })
+
+    METRICS_FIELDS = frozenset({
+        "returns", "volatility",
     })
 
     def __init__(self, data: dict | None = None):
@@ -131,6 +141,17 @@ class TickerInfo:
     def week_52_low(self) -> float | None:
         return self._data.get("week_52_low")
 
+    # --- Metrics Data ---
+    @property
+    def returns(self) -> float | None:
+        """Annualized return calculated from 1-year daily prices."""
+        return self._data.get("returns")
+
+    @property
+    def volatility(self) -> float | None:
+        """Annualized volatility calculated from 1-year daily prices."""
+        return self._data.get("volatility")
+
     # --- Timestamps ---
     @property
     def updated_at(self) -> str:
@@ -141,6 +162,11 @@ class TickerInfo:
     def market_updated_at(self) -> str:
         """When market data was last fetched."""
         return self._data.get("market_updated_at", "")
+
+    @property
+    def metrics_updated_at(self) -> str:
+        """When metrics were last calculated."""
+        return self._data.get("metrics_updated_at", "")
 
     # --- Serialization ---
     def to_dict(self) -> dict:
@@ -199,6 +225,24 @@ class TickerInfo:
             updated = datetime.fromisoformat(self.market_updated_at.replace("Z", "+00:00"))
             age = datetime.now(timezone.utc) - updated
             return age.total_seconds() > max_age_hours * 3600
+        except ValueError:
+            return True
+
+    def update_metrics(self, data: dict):
+        """Update metrics fields from data dict."""
+        for field in self.METRICS_FIELDS:
+            if field in data and data[field] is not None:
+                self._data[field] = data[field]
+        self._data["metrics_updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    def needs_metrics_refresh(self, max_age_days: int = 7) -> bool:
+        """Check if metrics are stale (default 7 days)."""
+        if not self.metrics_updated_at:
+            return True
+        try:
+            updated = datetime.fromisoformat(self.metrics_updated_at.replace("Z", "+00:00"))
+            age = datetime.now(timezone.utc) - updated
+            return age.days > max_age_days
         except ValueError:
             return True
 
@@ -439,6 +483,79 @@ def _extract_market_data(meta: dict) -> dict:
     }
 
 
+def _fetch_historical_prices(symbol: str, period: str = "1y") -> list[float] | None:
+    """Fetch historical adjusted close prices from Yahoo Finance.
+
+    Args:
+        symbol: Ticker symbol
+        period: Time period (1y = 1 year, default)
+
+    Returns:
+        List of adjusted close prices (oldest to newest), or None on failure
+    """
+    url = f"{CHART_URL}/{symbol}?interval=1d&range={period}"
+    data = _fetch_json(url)
+
+    if not data:
+        return None
+
+    result = data.get("chart", {}).get("result", [])
+    if not result:
+        return None
+
+    indicators = result[0].get("indicators", {})
+    adjclose_list = indicators.get("adjclose", [])
+    if adjclose_list and adjclose_list[0]:
+        prices = adjclose_list[0].get("adjclose", [])
+        # Filter out None values
+        return [p for p in prices if p is not None]
+
+    # Fallback to regular close if adjclose not available
+    quote_list = indicators.get("quote", [])
+    if quote_list and quote_list[0]:
+        prices = quote_list[0].get("close", [])
+        return [p for p in prices if p is not None]
+
+    return None
+
+
+def _calculate_metrics(prices: list[float]) -> dict[str, float] | None:
+    """Calculate annualized return and volatility from price series.
+
+    Args:
+        prices: List of adjusted close prices (oldest to newest)
+
+    Returns:
+        Dict with 'returns' and 'volatility' (annualized), or None if insufficient data
+    """
+    if not prices or len(prices) < 20:  # Need at least 20 data points
+        return None
+
+    # Calculate daily returns: (P_t - P_{t-1}) / P_{t-1}
+    daily_returns = []
+    for i in range(1, len(prices)):
+        if prices[i - 1] != 0:
+            daily_returns.append((prices[i] - prices[i - 1]) / prices[i - 1])
+
+    if not daily_returns:
+        return None
+
+    # Calculate mean and standard deviation
+    n = len(daily_returns)
+    mean_return = sum(daily_returns) / n
+    variance = sum((r - mean_return) ** 2 for r in daily_returns) / n
+    std_return = math.sqrt(variance)
+
+    # Annualize (252 trading days)
+    annualized_return = mean_return * 252
+    annualized_volatility = std_return * math.sqrt(252)
+
+    return {
+        "returns": annualized_return,
+        "volatility": annualized_volatility,
+    }
+
+
 def _build_ticker_info(symbol: str, quote: dict | None = None, meta: dict | None = None) -> TickerInfo:
     """Build TickerInfo from Yahoo search quote and/or chart meta.
 
@@ -553,13 +670,19 @@ def lookup_name(query: str, max_results: int = 10) -> dict[str, TickerInfo]:
     return result
 
 
-def lookup_many(queries: list[str], use_cache: bool = True, refresh_market: bool = False) -> dict[str, TickerInfo]:
+def lookup_many(
+    queries: list[str],
+    use_cache: bool = True,
+    refresh_market: bool = False,
+    refresh_metrics: bool = False,
+) -> dict[str, TickerInfo]:
     """Look up multiple queries (tickers or names).
 
     Args:
         queries: List of tickers or company names
         use_cache: Use cached static data if fresh
         refresh_market: Force refresh of market data even if cached
+        refresh_metrics: Force refresh of metrics (returns, volatility) even if cached
     """
     result: dict[str, TickerInfo] = {}
 
@@ -576,19 +699,29 @@ def lookup_many(queries: list[str], use_cache: bool = True, refresh_market: bool
             names.append(q)
 
     # Batch lookup tickers - check cache first
-    if use_cache and not refresh_market:
+    if use_cache and not refresh_market and not refresh_metrics:
         cached = _cache.get_many(tickers)
         result.update(cached)
         tickers = [t for t in tickers if t not in cached]
-    elif use_cache and refresh_market:
-        # Still use cache but need to refresh market data
+    elif use_cache:
+        # Use cache but refresh market/metrics as needed
         cached = _cache.get_many(tickers)
         for symbol, info in cached.items():
-            if info.needs_market_refresh():
+            updated = False
+            if refresh_market and info.needs_market_refresh():
                 meta = _get_chart_meta(symbol)
                 if meta:
                     info.update_market(_extract_market_data(meta))
-                    _cache.put(info)
+                    updated = True
+            if refresh_metrics and info.needs_metrics_refresh():
+                prices = _fetch_historical_prices(symbol)
+                if prices:
+                    metrics = _calculate_metrics(prices)
+                    if metrics:
+                        info.update_metrics(metrics)
+                        updated = True
+            if updated:
+                _cache.put(info)
             result[symbol] = info
         tickers = [t for t in tickers if t not in cached]
 
@@ -596,6 +729,14 @@ def lookup_many(queries: list[str], use_cache: bool = True, refresh_market: bool
     for ticker in tickers:
         info = lookup_ticker(ticker, use_cache=False, refresh_market=refresh_market)
         if info:
+            # Also fetch metrics if requested
+            if refresh_metrics:
+                prices = _fetch_historical_prices(ticker)
+                if prices:
+                    metrics = _calculate_metrics(prices)
+                    if metrics:
+                        info.update_metrics(metrics)
+                        _cache.put(info)
             result[info.symbol] = info
         else:
             result[ticker] = TickerInfo.empty(ticker)
@@ -650,6 +791,11 @@ def main() -> int:
         help="Refresh market data (price, volume, etc.); without query refreshes all cached",
     )
     parser.add_argument(
+        "--refresh-metrics",
+        action="store_true",
+        help="Refresh metrics (returns, volatility); without query refreshes all cached",
+    )
+    parser.add_argument(
         "--candidates", "-c",
         type=int,
         default=5,
@@ -684,7 +830,7 @@ def main() -> int:
                     all_tickers.append(next(iter(matches)))
 
     if not all_tickers:
-        if args.refresh_market:
+        if args.refresh_market or args.refresh_metrics:
             # Refresh all cached tickers
             all_tickers = list(_cache.all().keys())
             if not all_tickers:
@@ -705,7 +851,12 @@ def main() -> int:
             unique_tickers.append(t)
 
     # Look up all tickers (uses cache)
-    results = lookup_many(unique_tickers, use_cache=not args.no_cache, refresh_market=args.refresh_market)
+    results = lookup_many(
+        unique_tickers,
+        use_cache=not args.no_cache,
+        refresh_market=args.refresh_market,
+        refresh_metrics=args.refresh_metrics,
+    )
 
     print(format_output(results))
     return 0

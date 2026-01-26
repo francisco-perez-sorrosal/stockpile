@@ -55,19 +55,27 @@ Handle disambiguation if multiple matches are found—ask the user to choose.
 python scripts/stock_clusters.py --index nasdaq100
 ```
 
-### Step 2: Load Price Data and Calculate Metrics
+### Step 2: Calculate Metrics via Ticker Skill
 
-Run the script to download price data and calculate return/volatility metrics:
+The script reads pre-computed metrics from the `/ticker` skill's shared cache at `~/.cache/ticker/tickers.json`.
+
+First, ensure metrics are calculated for your tickers:
+
+```bash
+python ../ticker/scripts/ticker.py "AAPL,MSFT,GOOGL,NVDA,META" --refresh-metrics
+```
+
+Then run clustering with elbow analysis:
 
 ```bash
 python scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,NVDA,META" --elbow --elbow-output elbow.png
 ```
 
-The script:
-1. Downloads 1 year of daily prices from Yahoo Finance
-2. Calculates **annualized return**: `mean(daily_returns) * 252`
-3. Calculates **annualized volatility**: `std(daily_returns) * sqrt(252)`
-4. Generates the elbow curve and saves it to `elbow.png`
+The `/ticker` skill calculates:
+- **Annualized return**: `mean(daily_returns) * 252`
+- **Annualized volatility**: `std(daily_returns) * sqrt(252)`
+
+Metrics are cached for 7 days. Use `--refresh-metrics` on the ticker skill to recalculate.
 
 ### Step 3: View and Analyze the Elbow Curve
 
@@ -195,13 +203,13 @@ Plotly scatter plot with hover tooltips showing ticker, company name, sector, an
 ## Data Sources
 
 - **Ticker lists**: Custom input, or Wikipedia (S&P 500, NASDAQ-100, Dow Jones)
-- **Price data**: Yahoo Finance Chart API (1 year daily)
+- **Metrics data**: Shared cache at `~/.cache/ticker/tickers.json` (populated by `/ticker` skill)
 - **Company info**: Via `/ticker` skill (batch lookup)
 
 ## Dependencies
 
 **Skill dependency:**
-- `/ticker` - Required for company name/sector lookup
+- `/ticker` - Required for metrics (returns, volatility) and company info lookup
 
 **Python packages** (pre-installed in Claude environments):
 - `pandas`, `numpy`, `scipy`, `matplotlib`
@@ -209,17 +217,7 @@ Plotly scatter plot with hover tooltips showing ticker, company name, sector, an
 **Auto-installed** (for interactive charts):
 - `plotly` - Automatically installed on first use if not present
 
-No `yfinance` package needed—uses Yahoo Finance API directly.
-
-## Rate Limiting
-
-Yahoo Finance has aggressive rate limiting. If you see errors:
-
-1. **Increase delay**: `--delay 2.0` or higher
-2. **Test with subset first**: `--limit 50`
-3. **Wait and retry**: Rate limits reset after 10-15 minutes
-
-See [reference.md](reference.md) for technical details.
+No external API calls—reads metrics from shared cache populated by `/ticker` skill.
 
 ## See Also
 

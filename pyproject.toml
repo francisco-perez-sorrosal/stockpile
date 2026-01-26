@@ -1,0 +1,23 @@
+[project]
+name = "investment"
+version = "0.1.0"
+description = "Investment analysis tools and Claude skills"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "plotly",
+    "lxml",  # For pandas read_html
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+mcp = [
+    "mcp",
+    "httpx",
+]

@@ -30,7 +30,10 @@ wheels/
 venv/
 ENV/
 env/
-.venv
+.venv/
+
+# uv
+uv.lock
 
 # IDEs
 .vscode/

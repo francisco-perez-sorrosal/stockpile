@@ -542,7 +542,8 @@ def main() -> int:
             np.asarray(metrics["Volatility"])
         ]).T
         data_whitened = data / data.std(axis=0)
-        k_range = range(2, 20)
+        max_k = min(len(metrics), 20)  # Can't have more clusters than data points
+        k_range = range(2, max_k)
         distortions = find_elbow(data_whitened, k_range)
         plot_elbow(k_range, distortions, args.elbow_output)
         if not args.output and not args.csv:

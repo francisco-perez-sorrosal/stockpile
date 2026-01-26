@@ -13,184 +13,212 @@ Analyze specific stocks:
 python scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,NVDA,META"
 ```
 
-Analyze S&P 500 stocks (default):
+## Using in Claude
 
-```bash
-python scripts/stock_clusters.py
+Ask Claude to analyze stocks:
+
+```
+cluster Apple, Microsoft, Google, Nvidia, and Meta by return and volatility
 ```
 
-Analyze NASDAQ-100:
+```
+analyze these tech stocks and show me high performers with low risk: AAPL, MSFT, GOOGL, NVDA, META
+```
+
+```
+cluster NASDAQ-100 stocks and identify the best risk-adjusted performers
+```
+
+Claude will:
+1. Convert company names to tickers using `/ticker` if needed
+2. Run the clustering analysis
+3. Generate visualizations
+4. Help interpret the clusters
+
+## Workflow
+
+### Step 1: Get Ticker Symbols
+
+**If the user provides company names** (not ticker symbols), use `/ticker` to convert them:
+
+```bash
+python ../ticker/scripts/ticker.py "Apple"
+```
+
+Handle disambiguation if multiple matches are found—ask the user to choose.
+
+**If the user provides ticker symbols directly**, proceed to Step 2.
+
+**If analyzing an index**, the script fetches tickers automatically:
 
 ```bash
 python scripts/stock_clusters.py --index nasdaq100
 ```
 
-Customize clusters and output:
+### Step 2: Load Price Data and Calculate Metrics
+
+Run the script to download price data and calculate return/volatility metrics:
 
 ```bash
-python scripts/stock_clusters.py --clusters 5 --output clusters.html
+python scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,NVDA,META" --elbow --elbow-output elbow.png
 ```
 
-## Using in Claude
+The script:
+1. Downloads 1 year of daily prices from Yahoo Finance
+2. Calculates **annualized return**: `mean(daily_returns) * 252`
+3. Calculates **annualized volatility**: `std(daily_returns) * sqrt(252)`
+4. Generates the elbow curve and saves it to `elbow.png`
 
-Ask Claude to analyze stock performance:
+### Step 3: View and Analyze the Elbow Curve
 
-```
-cluster AAPL, MSFT, GOOGL, NVDA, META, NFLX, and IBM by return and volatility
+**You MUST view the elbow curve image** (`elbow.png`) to determine the optimal number of clusters.
+
+The elbow curve shows distortion (y-axis) vs number of clusters k (x-axis). Look for:
+- The **"elbow" point**—where the curve bends sharply
+- This is where adding more clusters yields diminishing returns
+- The k value at the elbow is the optimal cluster count
+
+**After viewing the curve, identify:**
+1. The k value where the elbow occurs
+2. Report this value before proceeding to Step 4
+
+**Fallback guidelines** (if elbow is unclear):
+- Small ticker sets (< 10): Use k=2 or k=3
+- Medium sets (10-50): Use k=3 to k=5
+- Large sets (50+): Use k=4 to k=7
+
+### Step 4: Create Clusters with the Determined k
+
+Run with the k value you identified from the elbow curve:
+
+```bash
+python scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,NVDA,META" --clusters <k> --output clusters.html
 ```
 
-```
-analyze tech stocks and show me the highest performing ones with low volatility
+Replace `<k>` with the elbow value (e.g., `--clusters 3` if the elbow was at k=3)
+
+The script automatically labels each cluster based on its characteristics:
+- **Strong Return, Low Vol**: Best risk-adjusted performers
+- **Strong Return, High Vol**: High risk/reward opportunities
+- **Moderate Return, Low Vol**: Stable performers
+- **Low Return, Low Vol**: Defensive stocks
+- **Negative Return**: Underperformers to investigate
+
+### Step 5: Present the Cluster Visualization
+
+**You MUST present the `clusters.html` file to the user** before interpreting the results.
+
+This allows the user to:
+- See the interactive scatter plot
+- Hover over data points to explore individual stocks
+- Form their own observations before your interpretation
+
+### Step 6: Interpret the Cluster Visualization
+
+After the user has seen the plot, provide your interpretation:
+
+**Scatter plot axes:**
+- **X-axis**: Annualized return (higher = better performance)
+- **Y-axis**: Annualized volatility (higher = more risk)
+
+**Hover info shows:**
+- Ticker symbol and company name
+- Industry/sector classification
+- Exact return and volatility percentages
+- Cluster profile label
+
+**Key patterns to identify:**
+- Upper-left quadrant: High return, low volatility (ideal candidates)
+- Upper-right quadrant: High return, high volatility (aggressive/risky)
+- Lower-left quadrant: Low return, low volatility (defensive/stable)
+- Outliers: May indicate special situations worth investigating
+
+**Summarize for the user:**
+1. Which cluster contains the best risk-adjusted performers
+2. Notable stocks in each cluster
+3. Any surprising outliers or patterns
+
+### Step 7: Get More Details on Specific Stocks
+
+For deeper analysis of any ticker found in the results, use `/ticker`:
+
+```bash
+python ../ticker/scripts/ticker.py --ticker NVDA --details
 ```
 
-```
-cluster NASDAQ-100 stocks by risk and return
-```
-
-Claude will run the analysis, generate an interactive scatter plot, and help interpret the clusters.
+This provides company name, sector, industry, and market cap.
 
 ## Common Tasks
 
 | Task | Command |
 |------|---------|
 | Analyze specific stocks | `python scripts/stock_clusters.py -t "AAPL,MSFT,GOOGL"` |
+| Analyze with elbow curve | `python scripts/stock_clusters.py -t "..." --elbow` |
 | Analyze NASDAQ-100 | `python scripts/stock_clusters.py -i nasdaq100` |
 | Analyze Dow Jones | `python scripts/stock_clusters.py -i dow` |
-| Default analysis (S&P 500, 5 clusters) | `python scripts/stock_clusters.py` |
-| Custom cluster count | `python scripts/stock_clusters.py -k 7` |
-| Save interactive chart | `python scripts/stock_clusters.py -o chart.html` |
-| Show elbow curve | `python scripts/stock_clusters.py --elbow` |
-| Export cluster data | `python scripts/stock_clusters.py --csv results.csv` |
-| Test with fewer tickers | `python scripts/stock_clusters.py --limit 50` |
-| Slower requests (rate limiting) | `python scripts/stock_clusters.py --delay 2.0` |
-
-## Workflow
-
-### 1. Run the Analysis
-
-```bash
-python scripts/stock_clusters.py --clusters 5 --output analysis.html
-```
-
-The script:
-1. Gets tickers from custom list, or fetches from index (S&P 500, NASDAQ-100, Dow Jones)
-2. Downloads 1 year of daily prices from Yahoo Finance
-3. Calculates annualized return and volatility for each stock
-4. Clusters stocks using K-means
-5. Generates an interactive scatter plot
-
-### 2. Interpret the Clusters
-
-The scatter plot shows:
-- **X-axis**: Annualized return (higher = better performance)
-- **Y-axis**: Annualized volatility (higher = more risk)
-
-Hover over dots to see ticker symbols. Look for:
-
-- **High return, low volatility**: Ideal candidates (upper-left quadrant)
-- **High return, high volatility**: High risk/reward (upper-right)
-- **Low return, low volatility**: Stable but slow growth (lower-left)
-- **Outliers**: May indicate special situations worth investigating
-
-### 3. Find Optimal Cluster Count
-
-Use the elbow method to determine the optimal number of clusters:
-
-```bash
-python scripts/stock_clusters.py --elbow
-```
-
-The elbow point (where diminishing returns start) suggests the optimal k value.
-
-### 4. Disambiguate Tickers
-
-If you need more information about a specific ticker found in the results, use `/ticker`:
-
-```bash
-python ../ticker/scripts/ticker.py --ticker NVDA
-```
-
-## Understanding the Metrics
-
-### Annualized Return
-Daily returns averaged and scaled to 252 trading days:
-```
-Return = mean(daily_pct_change) * 252
-```
-
-### Annualized Volatility
-Standard deviation of daily returns scaled to annual:
-```
-Volatility = std(daily_pct_change) * sqrt(252)
-```
-
-Higher volatility means larger price swings. A stock with 30% volatility might swing 30% up or down in a year under normal conditions.
+| Analyze S&P 500 (default) | `python scripts/stock_clusters.py` |
+| Custom cluster count | `python scripts/stock_clusters.py -t "..." -k 4` |
+| Save interactive chart | `python scripts/stock_clusters.py -t "..." -o chart.html` |
+| Export cluster data | `python scripts/stock_clusters.py -t "..." --csv results.csv` |
+| Skip company info (faster) | `python scripts/stock_clusters.py -t "..." --no-info` |
 
 ## Output Format
 
 ### Console Output
-```
-Cluster 0 (45 stocks): Avg Return=12.3%, Avg Volatility=25.1%
-Cluster 1 (89 stocks): Avg Return=8.7%, Avg Volatility=18.4%
-...
 
-Top performers by return:
-  NVDA: Return=125.4%, Volatility=45.2%, Cluster=2
-  META: Return=89.3%, Volatility=38.1%, Cluster=2
+```
+=== Cluster Summary ===
+
+Strong Return, Low Vol (2 stocks): Avg Return=45.6%, Avg Volatility=31.8%
+Strong Return, High Vol (1 stocks): Avg Return=56.8%, Avg Volatility=45.4%
+Low Return, Low Vol (4 stocks): Avg Return=5.7%, Avg Volatility=31.7%
+
+=== Top Performers by Return ===
+
+  GOOGL (Alphabet Inc.): Return=59.4%, Volatility=32.1% [Strong Return, Low Vol]
+  NVDA (NVIDIA Corporation): Return=56.8%, Volatility=45.4% [Strong Return, High Vol]
   ...
 ```
 
 ### CSV Export
+
 ```csv
-Ticker,Returns,Volatility,Cluster
-AAPL,0.234,0.281,1
-MSFT,0.187,0.245,1
-...
+Ticker,Returns,Volatility,Cluster,Name,Sector,ClusterLabel
+AAPL,0.127,0.320,1,Apple Inc.,Consumer Electronics,"Strong Return, Low Vol"
+MSFT,0.100,0.243,0,Microsoft Corporation,Software—Infrastructure,"Low Return, Low Vol"
 ```
 
 ### Interactive HTML
-Plotly scatter plot with hover tooltips showing ticker details.
+
+Plotly scatter plot with hover tooltips showing ticker, company name, sector, and metrics.
 
 ## Data Sources
 
-- **Ticker lists**:
-  - Custom tickers via `--tickers` argument
-  - S&P 500 from Wikipedia (default)
-  - NASDAQ-100 from Wikipedia
-  - Dow Jones from Wikipedia
+- **Ticker lists**: Custom input, or Wikipedia (S&P 500, NASDAQ-100, Dow Jones)
 - **Price data**: Yahoo Finance Chart API (1 year daily)
+- **Company info**: Yahoo Finance Search API
 
 ## Dependencies
 
-**Required packages** (pre-installed in Claude environments):
-- `pandas` - Data manipulation
-- `numpy` - Numerical operations
-- `scipy` - K-means clustering (scipy.cluster.vq)
-- `matplotlib` - Static plotting (fallback)
+**Required** (pre-installed in Claude environments):
+- `pandas`, `numpy`, `scipy`, `matplotlib`
 
-**Optional** (for interactive charts):
-- `plotly` - Interactive HTML charts
+**Auto-installed** (for interactive charts):
+- `plotly` - Automatically installed on first use if not present
 
-The script uses Yahoo Finance API directly (no `yfinance` package needed).
-
-## Limitations
-
-- 1-year lookback period (fixed)
-- Stocks with insufficient price history are skipped
-- Yahoo Finance rate limits may affect large batch downloads
-- Index tickers are fetched from Wikipedia (may not be 100% up-to-date)
+No `yfinance` package needed—uses Yahoo Finance API directly.
 
 ## Rate Limiting
 
-Yahoo Finance has aggressive CDN-level rate limiting. If you see "Edge: Too Many Requests" errors or high failure rates:
+Yahoo Finance has aggressive rate limiting. If you see errors:
 
 1. **Increase delay**: `--delay 2.0` or higher
-2. **Test with subset first**: `--limit 50` to verify connectivity
+2. **Test with subset first**: `--limit 50`
 3. **Wait and retry**: Rate limits reset after 10-15 minutes
 
-See [reference.md](reference.md) for technical details on rate limiting mitigations.
+See [reference.md](reference.md) for technical details.
 
 ## See Also
 
-- `/ticker` - Look up ticker details and disambiguate symbols
-- [reference.md](reference.md) - Technical details on Yahoo Finance API and clustering algorithm
+- `/ticker` - Look up ticker symbols and company details
+- [reference.md](reference.md) - Yahoo Finance API and clustering algorithm details

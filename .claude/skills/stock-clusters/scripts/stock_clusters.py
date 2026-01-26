@@ -50,6 +50,12 @@ class StockMetrics(NamedTuple):
     cluster: int
 
 
+class TickerInfo(NamedTuple):
+    ticker: str
+    name: str
+    sector: str
+
+
 def _decode_response(response) -> str:
     """Decode HTTP response, handling gzip compression if present."""
     data = response.read()
@@ -128,6 +134,53 @@ def fetch_tickers(index: str = "sp500") -> list[str]:
         return fetch_dowjones_tickers()
     else:
         raise ValueError(f"Unknown index: {index}. Use 'sp500', 'nasdaq100', or 'dow'")
+
+
+def fetch_ticker_info(ticker: str) -> TickerInfo:
+    """Fetch company name and sector from Yahoo Finance search API."""
+    # Use the search API which doesn't require authentication
+    params = urllib.parse.urlencode({"q": ticker, "quotesCount": 1, "newsCount": 0})
+    url = f"https://query2.finance.yahoo.com/v1/finance/search?{params}"
+    data = _fetch_with_retry(url)
+
+    name = ticker
+    sector = ""
+
+    if data:
+        quotes = data.get("quotes", [])
+        for quote in quotes:
+            if quote.get("symbol", "").upper() == ticker.upper():
+                name = quote.get("shortname") or quote.get("longname") or ticker
+                # Search API provides industry but not sector
+                sector = quote.get("industry", "")
+                break
+
+    return TickerInfo(ticker=ticker, name=name, sector=sector)
+
+
+def fetch_all_ticker_info(
+    tickers: list[str],
+    verbose: bool = True,
+    delay_min: float = REQUEST_DELAY_MIN,
+    delay_max: float = REQUEST_DELAY_MAX,
+) -> dict[str, TickerInfo]:
+    """Fetch company info for multiple tickers."""
+    info_map: dict[str, TickerInfo] = {}
+
+    if verbose:
+        print(f"Fetching company info for {len(tickers)} tickers...", file=sys.stderr)
+
+    for i, ticker in enumerate(tickers):
+        if verbose and (i + 1) % 50 == 0:
+            print(f"  Fetching info {i + 1}/{len(tickers)}...", file=sys.stderr)
+
+        info = fetch_ticker_info(ticker)
+        info_map[ticker] = info
+
+        if i < len(tickers) - 1:
+            time.sleep(random.uniform(delay_min, delay_max))
+
+    return info_map
 
 
 def _fetch_with_retry(url: str, max_retries: int = MAX_RETRIES) -> dict | None:
@@ -279,6 +332,63 @@ def cluster_stocks(metrics: pd.DataFrame, n_clusters: int) -> pd.DataFrame:
     return result
 
 
+def label_clusters(clusters_df: pd.DataFrame) -> dict[int, str]:
+    """Generate descriptive labels for each cluster based on return/volatility.
+
+    Labels are based on relative position within the dataset:
+    - High/Low Return: above/below median return
+    - High/Low Vol: above/below median volatility
+    """
+    median_return = clusters_df["Returns"].median()
+    median_vol = clusters_df["Volatility"].median()
+
+    labels = {}
+    for cluster_id in clusters_df["Cluster"].unique():
+        subset = clusters_df[clusters_df["Cluster"] == cluster_id]
+        avg_return = subset["Returns"].mean()
+        avg_vol = subset["Volatility"].mean()
+
+        # Determine return level
+        if avg_return >= median_return * 1.5:
+            ret_label = "Strong"
+        elif avg_return >= median_return:
+            ret_label = "Moderate"
+        elif avg_return >= 0:
+            ret_label = "Low"
+        else:
+            ret_label = "Negative"
+
+        # Determine volatility level
+        if avg_vol >= median_vol * 1.5:
+            vol_label = "High Vol"
+        elif avg_vol >= median_vol:
+            vol_label = "Moderate Vol"
+        else:
+            vol_label = "Low Vol"
+
+        labels[cluster_id] = f"{ret_label} Return, {vol_label}"
+
+    return labels
+
+
+def enrich_clusters_with_info(
+    clusters_df: pd.DataFrame,
+    ticker_info: dict[str, TickerInfo],
+    cluster_labels: dict[int, str],
+) -> pd.DataFrame:
+    """Add company info and cluster labels to clusters dataframe."""
+    df = clusters_df.copy()
+
+    # Add company info
+    df["Name"] = df["Ticker"].apply(lambda t: ticker_info.get(t, TickerInfo(t, t, "Unknown")).name)
+    df["Sector"] = df["Ticker"].apply(lambda t: ticker_info.get(t, TickerInfo(t, t, "Unknown")).sector)
+
+    # Add cluster labels
+    df["ClusterLabel"] = df["Cluster"].map(cluster_labels)
+
+    return df
+
+
 def plot_elbow(k_range: range, distortions: list[float], output: str | None = None):
     """Plot elbow curve to determine optimal cluster count."""
     try:
@@ -303,24 +413,71 @@ def plot_elbow(k_range: range, distortions: list[float], output: str | None = No
             print(f"  k={k}: {d:.2f}")
 
 
+def _ensure_plotly():
+    """Ensure plotly is installed, installing it if necessary."""
+    try:
+        import plotly.express as px
+        return px
+    except ImportError:
+        import subprocess
+        print("Installing plotly for interactive charts...", file=sys.stderr)
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "plotly"])
+        import plotly.express as px
+        return px
+
+
 def plot_clusters_interactive(clusters_df: pd.DataFrame, output: str | None = None):
     """Create interactive scatter plot with Plotly."""
     try:
-        import plotly.express as px
+        px = _ensure_plotly()
+
+        # Use ClusterLabel for color if available, otherwise Cluster
+        color_col = "ClusterLabel" if "ClusterLabel" in clusters_df.columns else "Cluster"
+
+        # Build hover data based on available columns
+        hover_cols = ["Ticker"]
+        if "Name" in clusters_df.columns:
+            hover_cols.append("Name")
+        if "Sector" in clusters_df.columns:
+            hover_cols.append("Sector")
+
+        # Create custom hover template for richer info
+        df = clusters_df.copy()
+        df["Return %"] = (df["Returns"] * 100).round(1)
+        df["Volatility %"] = (df["Volatility"] * 100).round(1)
 
         fig = px.scatter(
-            clusters_df,
+            df,
             x="Returns",
             y="Volatility",
-            color="Cluster",
-            hover_data=["Ticker"],
+            color=color_col,
+            hover_data={
+                "Ticker": True,
+                "Name": True if "Name" in df.columns else False,
+                "Sector": True if "Sector" in df.columns else False,
+                "Return %": True,
+                "Volatility %": True,
+                "Returns": False,  # Hide raw values
+                "Volatility": False,
+            },
             title="Stock Clusters by Return and Volatility",
             labels={
                 "Returns": "Annualized Return",
                 "Volatility": "Annualized Volatility",
+                "ClusterLabel": "Cluster",
             },
         )
-        fig.update_layout(coloraxis_showscale=False)
+
+        # Improve layout
+        fig.update_layout(
+            legend_title_text="Cluster Profile",
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=1.02,
+            ),
+        )
         fig.update_traces(
             marker=dict(size=10, symbol="diamond", line=dict(width=1, color="DarkSlateGrey"))
         )
@@ -343,17 +500,27 @@ def plot_clusters_static(clusters_df: pd.DataFrame, output: str | None = None):
 
         fig, ax = plt.subplots(figsize=(12, 8))
 
-        clusters = clusters_df["Cluster"].unique()
+        clusters = sorted(clusters_df["Cluster"].unique())
         colors = plt.cm.tab10(np.linspace(0, 1, len(clusters)))
 
-        for cluster, color in zip(sorted(clusters), colors):
+        # Get cluster labels if available
+        has_labels = "ClusterLabel" in clusters_df.columns
+
+        for cluster, color in zip(clusters, colors):
             mask = clusters_df["Cluster"] == cluster
             subset = clusters_df[mask]
+
+            # Use descriptive label if available
+            if has_labels:
+                label = subset["ClusterLabel"].iloc[0]
+            else:
+                label = f"Cluster {cluster}"
+
             ax.scatter(
                 subset["Returns"],
                 subset["Volatility"],
                 c=[color],
-                label=f"Cluster {cluster}",
+                label=f"{label} ({len(subset)})",
                 alpha=0.7,
                 s=50,
             )
@@ -361,8 +528,10 @@ def plot_clusters_static(clusters_df: pd.DataFrame, output: str | None = None):
         ax.set_xlabel("Annualized Return")
         ax.set_ylabel("Annualized Volatility")
         ax.set_title("Stock Clusters by Return and Volatility")
-        ax.legend()
+        ax.legend(title="Cluster Profile", loc="upper left", bbox_to_anchor=(1.02, 1))
         ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
 
         if output:
             plt.savefig(output, dpi=150, bbox_inches="tight")
@@ -378,24 +547,41 @@ def print_cluster_summary(clusters_df: pd.DataFrame):
     """Print summary statistics for each cluster."""
     print("\n=== Cluster Summary ===\n")
 
+    has_labels = "ClusterLabel" in clusters_df.columns
+    has_info = "Name" in clusters_df.columns
+
     for cluster in sorted(clusters_df["Cluster"].unique()):
         subset = clusters_df[clusters_df["Cluster"] == cluster]
         avg_ret = subset["Returns"].mean() * 100
         avg_vol = subset["Volatility"].mean() * 100
-        print(f"Cluster {cluster} ({len(subset)} stocks): "
-              f"Avg Return={avg_ret:.1f}%, Avg Volatility={avg_vol:.1f}%")
+
+        if has_labels:
+            label = subset["ClusterLabel"].iloc[0]
+            print(f"{label} ({len(subset)} stocks): "
+                  f"Avg Return={avg_ret:.1f}%, Avg Volatility={avg_vol:.1f}%")
+        else:
+            print(f"Cluster {cluster} ({len(subset)} stocks): "
+                  f"Avg Return={avg_ret:.1f}%, Avg Volatility={avg_vol:.1f}%")
 
     print("\n=== Top Performers by Return ===\n")
     top = clusters_df.nlargest(10, "Returns")
     for _, row in top.iterrows():
-        print(f"  {row['Ticker']}: Return={row['Returns']*100:.1f}%, "
-              f"Volatility={row['Volatility']*100:.1f}%, Cluster={row['Cluster']}")
+        info = ""
+        if has_info and row.get("Name") and row["Name"] != row["Ticker"]:
+            info = f" ({row['Name'][:30]})"
+        cluster_info = row.get("ClusterLabel", f"Cluster {row['Cluster']}")
+        print(f"  {row['Ticker']}{info}: Return={row['Returns']*100:.1f}%, "
+              f"Volatility={row['Volatility']*100:.1f}% [{cluster_info}]")
 
     print("\n=== Lowest Volatility ===\n")
     low_vol = clusters_df.nsmallest(10, "Volatility")
     for _, row in low_vol.iterrows():
-        print(f"  {row['Ticker']}: Return={row['Returns']*100:.1f}%, "
-              f"Volatility={row['Volatility']*100:.1f}%, Cluster={row['Cluster']}")
+        info = ""
+        if has_info and row.get("Name") and row["Name"] != row["Ticker"]:
+            info = f" ({row['Name'][:30]})"
+        cluster_info = row.get("ClusterLabel", f"Cluster {row['Cluster']}")
+        print(f"  {row['Ticker']}{info}: Return={row['Returns']*100:.1f}%, "
+              f"Volatility={row['Volatility']*100:.1f}% [{cluster_info}]")
 
 
 def main() -> int:
@@ -449,6 +635,11 @@ def main() -> int:
         "--index", "-i",
         default="sp500",
         help="Market index to analyze: 'sp500', 'nasdaq100', or 'dow' (default: sp500)",
+    )
+    parser.add_argument(
+        "--no-info",
+        action="store_true",
+        help="Skip fetching company names and sectors (faster but less detailed output)",
     )
 
     args = parser.parse_args()
@@ -516,6 +707,23 @@ def main() -> int:
     if verbose:
         print(f"Clustering into {args.clusters} groups...", file=sys.stderr)
     clusters_df = cluster_stocks(metrics, args.clusters)
+
+    # Label clusters based on characteristics
+    cluster_labels = label_clusters(clusters_df)
+
+    # Optionally fetch company info for richer output
+    ticker_info: dict[str, TickerInfo] = {}
+    if not args.no_info:
+        successful_tickers = clusters_df["Ticker"].tolist()
+        ticker_info = fetch_all_ticker_info(
+            successful_tickers,
+            verbose=verbose,
+            delay_min=args.delay,
+            delay_max=delay_max,
+        )
+
+    # Enrich clusters with labels and info
+    clusters_df = enrich_clusters_with_info(clusters_df, ticker_info, cluster_labels)
 
     # Print summary
     print_cluster_summary(clusters_df)

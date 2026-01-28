@@ -1,6 +1,6 @@
 # Makefile for ticker-cache MCP server
 
-.PHONY: install uninstall test run inspect build-mcpb sync-deps pack clean clean-bundle
+.PHONY: install uninstall test run run-http run-streamable inspect inspect-http inspect-streamable build-mcpb sync-deps pack clean clean-bundle
 
 # Get the absolute path to this directory
 DIR := $(shell pwd)
@@ -28,9 +28,25 @@ test:
 run:
 	uv run server.py
 
-# Run MCP inspector for interactive testing
+# Run server with HTTP/SSE transport for remote access
+run-http:
+	uv run server.py --transport sse --port 8000
+
+# Run server with streamable-http transport
+run-streamable:
+	uv run server.py --transport streamable-http --port 8000
+
+# Run MCP inspector for interactive testing (stdio)
 inspect:
 	npx @modelcontextprotocol/inspector uv --directory $(DIR) run server.py
+
+# Inspect HTTP server (run 'make run-http' first in another terminal)
+inspect-http:
+	npx @modelcontextprotocol/inspector --transport sse --server-url http://localhost:8000/sse
+
+# Inspect streamable-http server (run 'make run-streamable' first in another terminal)
+inspect-streamable:
+	npx @modelcontextprotocol/inspector --transport http --server-url http://localhost:8000/mcp
 
 # =============================================================================
 # MCPB Bundle (for Claude Desktop)

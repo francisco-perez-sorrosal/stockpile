@@ -74,17 +74,35 @@ make test
 # Run MCP inspector for interactive testing
 make inspect
 
-# Run server directly
+# Run server directly (stdio transport)
 make run
 ```
 
+## Remote Access (HTTP)
+
+The server supports HTTP transports for remote access:
+
+```bash
+# Start HTTP server on port 8000 (SSE transport)
+make run-http
+
+# Or with custom host/port
+uv run server.py --transport sse --host 0.0.0.0 --port 9000
+
+# Streamable HTTP transport (newer protocol)
+uv run server.py --transport streamable-http --port 8000
+```
+
+**Endpoints:**
+- SSE: `http://HOST:PORT/sse`
+- Streamable HTTP: `http://HOST:PORT/mcp`
+
 ## Build Process
 
-The MCPB bundle build:
+The MCPB bundle uses `uv` for dependency management at runtime:
 
-1. `make update-deps` - Syncs and exports dependencies to `requirements.txt`
-2. `make bundle-deps` - Installs dependencies to `lib/` for bundling
-3. `make pack` - Creates the `.mcpb` file using `npx @anthropic-ai/mcpb`
+1. `make sync-deps` - Syncs dependencies and creates `uv.lock`
+2. `make pack` - Creates the `.mcpb` file
 
 Or run all steps: `make build-mcpb`
 

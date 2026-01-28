@@ -61,8 +61,39 @@ STATIC_MAX_AGE_DAYS = 30
 MARKET_MAX_AGE_HOURS = 24
 METRICS_MAX_AGE_DAYS = 7
 
-# Initialize MCP server
-mcp = FastMCP("ticker-cache")
+
+def _parse_args():
+    """Parse CLI arguments early for server configuration."""
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description="Ticker Cache MCP Server")
+    parser.add_argument(
+        "--transport",
+        choices=["stdio", "sse", "streamable-http"],
+        default="stdio",
+        help="Transport protocol: stdio (default), sse, or streamable-http",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port for SSE transport (default: 8000)",
+    )
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host for SSE transport (default: 0.0.0.0)",
+    )
+    # Parse known args to avoid errors from other flags
+    args, _ = parser.parse_known_args()
+    return args
+
+
+_args = _parse_args()
+
+# Initialize MCP server with host/port for SSE transport
+mcp = FastMCP("ticker-cache", host=_args.host, port=_args.port)
 
 
 # =============================================================================
@@ -877,7 +908,7 @@ def refresh_metrics(symbols: str) -> str:
 # =============================================================================
 
 def main():
-    mcp.run(transport="stdio")
+    mcp.run(transport=_args.transport)
 
 
 if __name__ == "__main__":

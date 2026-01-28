@@ -72,7 +72,7 @@ Analyze Dow Jones stocks and identify the best performers
 Show me high-return, low-volatility stocks from the NASDAQ-100
 ```
 
-The skill outputs cluster statistics (mean returns, volatility, stock counts) and saves visualization plots to disk, making it easy to identify opportunities across different risk profiles.
+The skill outputs cluster statistics (mean returns, volatility, stock counts) and saves visualization plots to disk, making it easy to identify investment opportunities across different risk profiles.
 
 See `.claude/skills/stock-clusters/` for the complete implementation, including the SKILL.md definition and Python clustering script.
 

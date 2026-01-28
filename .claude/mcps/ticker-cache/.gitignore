@@ -8,5 +8,3 @@ __pycache__/
 
 # MCPB build artifacts
 lib/
-requirements.txt
-uv.lock

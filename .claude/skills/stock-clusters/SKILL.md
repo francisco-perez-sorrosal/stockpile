@@ -1,6 +1,6 @@
 ---
 name: stock-clusters
-description: Analyze stock tickers by return and volatility using K-means clustering. Use when exploring investment opportunities, identifying risk profiles, comparing market segments, finding high-performers, or analyzing portfolio positioning.
+description: Analyze stock tickers by return and volatility using K-means clustering. Use when exploring opportunities, identifying risk profiles, comparing market segments, finding high-performers, or analyzing portfolio positioning.
 ---
 
 Cluster stocks by annualized return and volatility using K-means to identify high-performers, stable assets, and outliers worth investigating.

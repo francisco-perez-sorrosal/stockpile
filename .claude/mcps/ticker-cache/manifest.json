@@ -11,10 +11,10 @@
     "url": "https://github.com/francisco-perez-sorrosal"
   },
   "license": "MIT",
-  "homepage": "https://github.com/francisco-perez-sorrosal/investment",
+  "homepage": "https://github.com/francisco-perez-sorrosal/stockpile",
   "repository": {
     "type": "git",
-    "url": "https://github.com/francisco-perez-sorrosal/investment.git"
+    "url": "https://github.com/francisco-perez-sorrosal/stockpile.git"
   },
   "server": {
     "type": "python",
@@ -38,7 +38,7 @@
     "stocks",
     "ticker",
     "yahoo finance",
-    "investment",
+    "stockpile",
     "portfolio",
     "market data",
     "S&P 500",

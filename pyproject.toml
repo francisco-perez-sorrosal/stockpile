@@ -1,7 +1,7 @@
 [project]
-name = "investment"
+name = "stockpile"
 version = "0.1.0"
-description = "Investment analysis tools and Claude skills"
+description = "Skills and MCP servers for investment research with Claude"
 requires-python = ">=3.11"
 dependencies = [
     "numpy",

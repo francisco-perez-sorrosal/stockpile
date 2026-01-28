@@ -2,7 +2,7 @@
 """Stock clustering by return and volatility using K-means.
 
 Clusters stocks by annualized return and volatility to identify
-investment opportunities. Reads metrics from the shared ticker cache
+opportunities. Reads metrics from the shared ticker cache
 (populated by the ticker-cache MCP server).
 
 This script focuses on analysis only - data fetching is done via MCP.

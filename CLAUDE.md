@@ -1,8 +1,8 @@
-# Investment Project
+# Stockpile
 
-Project containing programming artifacts related to investment analysis and tooling.
+Skills and MCP servers for investment research with Claude.
 
-**Repository**: `git@github.com:francisco-perez-sorrosal/investment.git`
+**Repository**: `git@github.com:francisco-perez-sorrosal/stockpile.git`
 
 ## Architecture
 

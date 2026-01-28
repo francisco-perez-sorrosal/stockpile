@@ -83,7 +83,7 @@ Cluster stocks by return/volatility using K-means. Orchestrates MCP data access 
     ├── dist/               # Built artifacts (zips, mcpb bundles)
     ├── mcps/
     │   └── ticker-cache/   # MCP server
-    │       ├── server.py
+    │       ├── main.py
     │       ├── pyproject.toml
     │       ├── manifest.json
     │       ├── Makefile

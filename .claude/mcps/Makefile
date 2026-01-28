@@ -61,7 +61,7 @@ clean: check-mcp
 list:
 	@echo "Available MCP servers:"
 	@for dir in */; do \
-		if [ -f "$$dir/server.py" ] || [ -f "$$dir/manifest.json" ]; then \
+		if [ -f "$$dir/main.py" ] || [ -f "$$dir/manifest.json" ]; then \
 			echo "  $${dir%/}"; \
 		fi \
 	done

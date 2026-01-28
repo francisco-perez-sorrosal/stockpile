@@ -18,10 +18,10 @@
   },
   "server": {
     "type": "python",
-    "entry_point": "server.py",
+    "entry_point": "main.py",
     "mcp_config": {
       "command": "uv",
-      "args": ["run", "--directory", "${__dirname}", "python", "server.py"]
+      "args": ["run", "--directory", "${__dirname}", "python", "main.py"]
     }
   },
   "tools": [

@@ -13,7 +13,7 @@ MCPB_DIR := ../../dist
 # =============================================================================
 
 install:
-	claude mcp add --scope user ticker-cache -- uv --directory $(DIR) run server.py
+	claude mcp add --scope user ticker-cache -- uv --directory $(DIR) run main.py
 
 uninstall:
 	claude mcp remove ticker-cache
@@ -23,22 +23,22 @@ uninstall:
 # =============================================================================
 
 test:
-	uv run python -c "from server import mcp; print('Server imports OK')"
+	uv run python -c "from main import mcp; print('Server imports OK')"
 
 run:
-	uv run server.py
+	uv run main.py
 
 # Run server with HTTP/SSE transport for remote access
 run-http:
-	uv run server.py --transport sse --port 8000
+	uv run main.py --transport sse --port 8000
 
 # Run server with streamable-http transport
 run-streamable:
-	uv run server.py --transport streamable-http --port 8000
+	uv run main.py --transport streamable-http --port 8000
 
 # Run MCP inspector for interactive testing (stdio)
 inspect:
-	npx @modelcontextprotocol/inspector uv --directory $(DIR) run server.py
+	npx @modelcontextprotocol/inspector uv --directory $(DIR) run main.py
 
 # Inspect HTTP server (run 'make run-http' first in another terminal)
 inspect-http:

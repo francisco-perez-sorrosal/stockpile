@@ -2,7 +2,7 @@
   "mcpServers": {
     "ticker-cache": {
       "command": "uv",
-      "args": ["--directory", ".claude/mcps/ticker-cache", "run", "server.py"]
+      "args": ["--directory", ".claude/mcps/ticker-cache", "run", "main.py"]
     }
   }
 }

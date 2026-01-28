@@ -87,10 +87,10 @@ The server supports HTTP transports for remote access:
 make run-http
 
 # Or with custom host/port
-uv run server.py --transport sse --host 0.0.0.0 --port 9000
+uv run main.py --transport sse --host 0.0.0.0 --port 9000
 
 # Streamable HTTP transport (newer protocol)
-uv run server.py --transport streamable-http --port 8000
+uv run main.py --transport streamable-http --port 8000
 ```
 
 **Endpoints:**

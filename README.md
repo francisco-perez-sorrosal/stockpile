@@ -2,99 +2,91 @@
 
 Skills and MCP servers for investment research with Claude.
 
-## Available Skills
+## Quick Start
 
-This repository includes skills and MCP servers for financial analysis and investment research:
+1. Install the MCP server:
+   ```bash
+   cd .claude/mcps/ticker-cache
+   make install
+   ```
+
+2. Use the skills:
+   ```
+   What's the ticker for Apple?
+   Cluster NASDAQ-100 stocks by return and volatility
+   ```
+
+## Architecture
+
+The project follows a layered architecture where all external data access goes through the MCP server:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Skills Layer                          │
+│  ticker/SKILL.md, stock-clusters/SKILL.md                   │
+├─────────────────────────────────────────────────────────────┤
+│                     ticker-cache MCP                         │
+│  Tools: lookup(), refresh_metrics()                          │
+│  Resources: ticker://cache, ticker://ticker/{symbol}, ...    │
+├─────────────────────────────────────────────────────────────┤
+│               Yahoo Finance + Wikipedia APIs                 │
+│               Cache: ~/.cache/ticker/tickers.json           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Available Skills
 
 ### Ticker Skill
 
-The **ticker** skill enables Claude to look up stock market ticker symbols from company names using Yahoo Finance. It demonstrates:
-
-- **Zero external dependencies**: Uses only Python standard library (urllib, json)
-- **Universal compatibility**: Works in Claude API, Claude Code, and Claude Desktop
-- **Robust search**: Handles company name disambiguation and provides detailed results
-- **Reference documentation**: Includes comprehensive API documentation
+Look up stock ticker symbols from company names using the MCP server.
 
 **Example usage:**
 
-Basic ticker lookup:
 ```
 What's the ticker symbol for Apple?
-Look up the stock ticker for Tesla
-Find the ticker for Microsoft
-```
-
-Ticker validation and reverse lookup:
-```
+Look up the ticker for Tesla
 Is AAPL a valid ticker symbol?
-Tell me about the company with ticker MSFT
-What company does ticker TSLA belong to?
+What sector and industry is Amazon in?
 ```
 
-Detailed company information (sector, industry, market cap):
-```
-Show me details about Netflix stock
-What sector and industry is Amazon in? Include market cap.
-Give me comprehensive information on ticker GOOGL
-```
-
-Disambiguation when multiple matches exist:
-```
-Find all tickers for companies named "National Bank"
-Search for tech companies with "Cloud" in their name
-```
-
-See `.claude/skills/ticker/` for the complete implementation, including the SKILL.md definition, Python scripts, and Yahoo Finance API reference documentation.
+The skill uses the `lookup()` MCP tool which auto-detects whether input is a ticker, company name, index name, or comma-separated list.
 
 ### Stock Clusters Skill
 
-The **stock-clusters** skill performs K-means clustering analysis on stocks based on returns and volatility. It demonstrates:
-
-- **Pre-installed packages only**: Uses pandas, numpy, scipy, and matplotlib (no yfinance dependency)
-- **Direct API access**: Fetches data from Yahoo Finance API without external libraries
-- **Flexible ticker selection**: Use custom tickers or fetch from major indexes (S&P 500, NASDAQ-100, Dow Jones)
-- **Configurable analysis**: Adjustable cluster counts and lookback periods
-- **Visual insights**: Generates scatter plots showing risk/reward profiles
+Cluster stocks by return and volatility using K-means analysis.
 
 **Example usage:**
 
-Basic clustering analysis:
 ```
 Cluster AAPL, MSFT, GOOGL, NVDA, and META by return and volatility
-Analyze tech stocks and show me risk/reward clusters
-Cluster NASDAQ-100 stocks by performance
+Cluster S&P 500 stocks into 7 groups
+Analyze NASDAQ-100 stocks and identify the best performers
 ```
 
-Customized analysis:
-```
-Cluster S&P 500 stocks into 7 groups based on risk and return
-Analyze Dow Jones stocks and identify the best performers
-Show me high-return, low-volatility stocks from the NASDAQ-100
-```
+The skill orchestrates:
+1. MCP data access via `lookup()` and `refresh_metrics()` tools
+2. K-means clustering via scipy
+3. Interactive visualizations via plotly
 
-The skill outputs cluster statistics (mean returns, volatility, stock counts) and saves visualization plots to disk, making it easy to identify investment opportunities across different risk profiles.
-
-See `.claude/skills/stock-clusters/` for the complete implementation, including the SKILL.md definition and Python clustering script.
+Outputs include cluster statistics (mean returns, volatility) and HTML scatter plots.
 
 ## Skills vs MCP
 
-| Aspect | Skills | MCP Servers |
-|--------|--------|-------------|
-| Primary function | Teaching workflows and domain expertise | Connecting to external data/APIs |
-| Format | SKILL.md files (Markdown + YAML frontmatter) | JSON-RPC protocol servers |
-| Token efficiency | ~100 tokens metadata, <5k full load | Can consume 10k+ tokens |
+| Aspect | Skills | MCP Server |
+|--------|--------|------------|
+| Purpose | Teaching workflows and domain expertise | Connecting to external data/APIs |
+| Format | SKILL.md files (Markdown + YAML) | JSON-RPC protocol server |
+| Data access | Via MCP tools | Direct API calls + caching |
 
-Anthropic's analogy: "MCP is like having access to the aisles. Skills are like an employee's expertise."
+Skills in this project depend on the MCP server for data. The MCP server handles Yahoo Finance API calls and caching, while skills contain the workflow instructions and domain logic.
 
 ## Skill Structure
 
-A skill is a directory containing:
-
 ```
 <skill_name>/
-├── SKILL.md        # Required: main instructions with YAML frontmatter
-├── reference.md    # Optional: technical reference, API docs
-└── scripts/        # Optional: Python scripts Claude can execute
+├── SKILL.md        # Required: instructions with YAML frontmatter
+├── reference.md    # Optional: technical reference
+└── scripts/        # Optional: Python scripts
     └── tool.py
 ```
 
@@ -108,84 +100,36 @@ description: Brief description of when Claude should use this skill.
 
 ## Quick Start
 ...
-
-## Common Tasks
-...
 ```
 
 **Constraints:**
 - `name`: max 64 characters
-- `description`: max 200 characters (Claude uses this to decide when to invoke the skill)
+- `description`: max 200 characters
 
-## Dependency Management
+## Building and Installing
 
-Skills rely on the execution environment's pre-installed packages—no `requirements.txt` or `pyproject.toml`.
+### MCP Server
 
-| Environment | Package Installation | Dependency Approach |
-|-------------|---------------------|---------------------|
-| **Claude API** | Pre-installed only | Use 184+ available packages |
-| **Claude Code** | Dynamic (`pip install`) | Auto-installs on `ModuleNotFoundError` |
-| **Claude.ai** | Platform-managed | Pre-installed packages only |
-
-### Pre-installed Packages (API Container)
-
-Python 3.11.12 with 184+ packages including:
-
-- **Data**: pandas, numpy, scipy, scikit-learn
-- **Visualization**: matplotlib, seaborn
-- **Documents**: pypdf, pdfplumber, python-docx, openpyxl
-- **Utilities**: pillow, pyarrow, PyYAML, tqdm
-
-Full list: [Code Execution Tool docs](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool)
-
-### Best Practices
-
-1. **Prefer Python standard library** for maximum portability (`urllib`, `json`, `argparse`)
-2. **Design for pre-installed packages** when targeting Claude API
-3. **Document dependencies clearly** in SKILL.md if external packages are required
-4. **Handle import errors gracefully** with try/except and helpful messages
-
-### Example: No External Dependencies
-
-The `ticker` skill uses only standard library to call Yahoo Finance APIs directly:
-
-```python
-import urllib.request
-import json
-
-# No pip install needed—works everywhere
+```bash
+cd .claude/mcps/ticker-cache
+make install      # Register with Claude Code
+make test         # Verify imports
+make inspect      # Interactive inspector
 ```
 
-This approach ensures the skill works in Claude API, Claude Code, and Claude.ai without modification.
-
-## Building and Installing Skills
-
-This project includes a Makefile in `.claude/skills/` to automate skill packaging and installation. The Makefile handles creating distribution zips for Claude Desktop/Web and installing skills locally for Claude Code.
-
-### Makefile Commands
-
-All commands must be run from the `.claude/skills/` directory with the `SKILL=<name>` parameter:
+### Skills
 
 ```bash
 cd .claude/skills
 
-# Build a distributable zip file
+# Build distributable zip
 make SKILL=ticker build
 
-# Install skill to ~/.claude/skills/ (for Claude Code)
+# Install to ~/.claude/skills/ (Claude Code)
 make SKILL=ticker install
-
-# Remove generated artifacts
-make SKILL=ticker clean
-
-# List contents of skill directory
-make SKILL=ticker list
-
-# Show available commands
-make help
 ```
 
-### Installing Skills in Claude Desktop / Web
+### Claude Desktop / Web
 
 1. Build the skill zip:
    ```bash
@@ -193,39 +137,25 @@ make help
    make SKILL=ticker build
    ```
 
-2. The zip file will be created in `.claude/dist/<skill_name>.zip`
+2. The zip is created in `.claude/dist/<skill_name>.zip`
 
 3. Open Claude Desktop → Settings → Capabilities → Skills
 
 4. Click "Upload skill" and select the zip file
 
-5. Toggle the skill on to activate it
-
-### Installing Skills in Claude Code
-
-Skills in `~/.claude/skills/` are automatically discovered. To install:
-
-```bash
-cd .claude/skills
-make SKILL=ticker install
-```
-
-This command builds the zip and extracts it to `~/.claude/skills/ticker/`, making it immediately available in Claude Code.
-
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
+| MCP tools not available | Run `make install` in `.claude/mcps/ticker-cache/` |
 | Skills section not visible | Enable "Code execution" in Settings; requires paid plan |
-| Claude not using skill | Check it's toggled on; ensure description explains when to use it |
+| Claude not using skill | Check it's toggled on; ensure description explains when to use |
 | Upload fails | Ensure ZIP has skill folder as root with valid SKILL.md frontmatter |
-| ModuleNotFoundError | Use standard library or pre-installed packages; Claude Code auto-installs |
 
 ## Resources
 
 - [Engineering deep-dive](https://anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills)
-- [GitHub examples](https://github.com/anthropics/skills)
-- [Open standard specification](https://agentskills.io)
-- [Code Execution Tool docs](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool)
+- [Skills GitHub examples](https://github.com/anthropics/skills)
+- [Skills open standard](https://agentskills.io)
 - [Help Center - Using Skills](https://support.claude.com/en/articles/12512180-using-skills-in-claude)
 - [Help Center - Creating Skills](https://support.claude.com/en/articles/12512198-how-to-create-custom-skills)

@@ -60,7 +60,6 @@ make install
 | Tool | Description |
 |------|-------------|
 | `lookup(query)` | Unified: ticker, list, index, or name |
-| `search(query, limit)` | Search company names |
 | `refresh_metrics(symbols)` | Calculate return/volatility |
 
 ## Skills
@@ -78,20 +77,25 @@ Cluster stocks by return/volatility using K-means. Orchestrates MCP data access 
 ```
 ├── CLAUDE.md               # Project instructions
 ├── README.md               # User documentation
+├── pyproject.toml          # Project dependencies
 ├── .mcp.json               # Project-level MCP configuration
 └── .claude/
+    ├── dist/               # Built artifacts (zips, mcpb bundles)
     ├── mcps/
     │   └── ticker-cache/   # MCP server
     │       ├── server.py
     │       ├── pyproject.toml
+    │       ├── manifest.json
     │       ├── Makefile
     │       └── README.md
     └── skills/
         ├── Makefile        # Skill maintenance
         ├── ticker/
-        │   └── SKILL.md
+        │   ├── SKILL.md
+        │   └── reference.md
         └── stock-clusters/
             ├── SKILL.md
+            ├── reference.md
             └── scripts/
                 └── stock_clusters.py
 ```

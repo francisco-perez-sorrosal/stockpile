@@ -1,0 +1,12 @@
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# MCPB build artifacts
+lib/
+requirements.txt
+uv.lock

@@ -1,0 +1,54 @@
+{
+  "manifest_version": "0.3",
+  "name": "ticker-cache-mcp",
+  "display_name": "Ticker Cache MCP Server",
+  "version": "0.0.1",
+  "description": "MCP server for stock ticker data cache with Yahoo Finance integration",
+  "long_description": "A comprehensive MCP server that provides cached access to stock ticker data from Yahoo Finance. Supports ticker lookup, company name search, market index retrieval (S&P 500, NASDAQ-100, Dow Jones), and metrics calculation (annualized return and volatility). Features a unified lookup API that auto-detects input type (ticker, comma-list, index name, or company name) and caches all results for performance.",
+  "author": {
+    "name": "Francisco Perez-Sorrosal",
+    "email": "fperezsorrosal@gmail.com",
+    "url": "https://github.com/francisco-perez-sorrosal"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/francisco-perez-sorrosal/investment",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/francisco-perez-sorrosal/investment.git"
+  },
+  "server": {
+    "type": "python",
+    "entry_point": "server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "python", "server.py"]
+    }
+  },
+  "tools": [
+    {
+      "name": "lookup",
+      "description": "Unified ticker lookup supporting single ticker, comma-separated list, index name (sp500, nasdaq100, dow), or company name search. Auto-detects input type and caches all results."
+    },
+    {
+      "name": "refresh_metrics",
+      "description": "Fetch 1-year historical prices and calculate annualized return and volatility for tickers or indexes."
+    }
+  ],
+  "keywords": [
+    "stocks",
+    "ticker",
+    "yahoo finance",
+    "investment",
+    "portfolio",
+    "market data",
+    "S&P 500",
+    "NASDAQ",
+    "cache"
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+# Virtual environment
+.venv/
+
+# Bundled dependencies (uv manages these at runtime)
+lib/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Build files
+requirements.txt
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/

@@ -120,9 +120,8 @@ Cluster labels are assigned automatically:
 |------|---------|
 | Analyze custom tickers | `python scripts/stock_clusters.py -t "AAPL,MSFT,GOOGL"` |
 | Analyze with elbow | `python scripts/stock_clusters.py -t "..." --elbow --elbow-output elbow.png` |
-| Analyze NASDAQ-100 | `python scripts/stock_clusters.py -i nasdaq100` |
-| Analyze S&P 500 | `python scripts/stock_clusters.py -i sp500` |
-| Analyze Dow Jones | `python scripts/stock_clusters.py -i dow` |
+| Analyze from data file | `python scripts/stock_clusters.py --data-file /tmp/data.json -k 3` |
+| Analyze from stdin | `python scripts/stock_clusters.py --data-file - -k 3 < data.json` |
 | Set cluster count | `python scripts/stock_clusters.py -t "..." -k 4` |
 | Save interactive chart | `python scripts/stock_clusters.py -t "..." -o clusters.html` |
 | Export to CSV | `python scripts/stock_clusters.py -t "..." --csv results.csv` |
@@ -172,18 +171,40 @@ MCP Server (ticker-cache)          Skill Script
        │                                 └──> console output
 ```
 
+## Data File Workflow
+
+The `--data-file` flag allows clustering from a JSON file instead of the shared cache. This is useful for:
+- API sandbox environments where the MCP server is not available
+- Reproducible analysis with saved data snapshots
+- Testing with custom datasets
+
+```bash
+# Save MCP lookup response to a file, then cluster from it
+python scripts/stock_clusters.py --data-file /tmp/nasdaq100_data.json -k 5 -o clusters.html
+
+# Read from stdin
+cat data.json | python scripts/stock_clusters.py --data-file - -k 3
+```
+
+The JSON format matches the cache structure:
+```json
+{
+  "AAPL": {"metrics": {"annualized_return": 0.127, "annualized_volatility": 0.320}},
+  "MSFT": {"returns": 0.185, "volatility": 0.245}
+}
+```
+
+When `--data-file` is provided, it takes precedence over the cache.
+
 ## Dependencies
 
-**MCP Server** (required for data):
-```bash
-cd .claude/mcps/ticker-cache && make install
-```
+**MCP Server** (auto-started by the plugin system when Stockpile is active):
+- The `ticker-cache` MCP server provides `lookup()` and `refresh_metrics()` tools
+- No manual installation needed -- `.mcp.json` at the plugin root handles auto-start
 
 **Python packages** (pre-installed in Claude environments):
 - pandas, numpy, scipy, matplotlib
-
-**Auto-installed** (for interactive charts):
-- plotly
+- plotly (optional -- falls back to matplotlib for static charts)
 
 ## See Also
 

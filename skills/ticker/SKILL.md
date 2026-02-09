@@ -82,8 +82,6 @@ Ticker info cached to `~/.cache/ticker/tickers.json`:
 
 ## Dependencies
 
-Requires **ticker-cache MCP server** to be installed:
-
-```bash
-cd .claude/mcps/ticker-cache && make install
-```
+Requires the **ticker-cache MCP server** (auto-started by the plugin system when Stockpile is active):
+- The MCP server provides `lookup()` and `refresh_metrics()` tools
+- No manual installation needed -- `.mcp.json` at the plugin root handles auto-start

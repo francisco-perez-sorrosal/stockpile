@@ -3,21 +3,14 @@ name = "stockpile"
 version = "0.1.0"
 description = "Skills and MCP servers for investment research with Claude"
 requires-python = ">=3.11"
-dependencies = [
-    "numpy",
-    "pandas",
-    "scipy",
-    "matplotlib",
-    "plotly",
-    "lxml",  # For pandas read_html
-]
+dependencies = []
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "ruff",
-]
-mcp = [
-    "mcp",
-    "httpx",
-]
+[tool.uv.workspace]
+members = ["mcp/*"]
+
+[dependency-groups]
+dev = ["pytest", "ruff"]
+scripts = ["numpy", "pandas", "scipy", "matplotlib"]
+
+[tool.hatch.build.targets.wheel]
+packages = []

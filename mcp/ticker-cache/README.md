@@ -4,7 +4,11 @@ MCP server for stock ticker data. Provides cached access to Yahoo Finance data w
 
 ## Installation
 
-### Claude Code
+### Claude Code (via plugin)
+
+The MCP server auto-starts when the Stockpile plugin is active. No manual installation needed -- `.mcp.json` at the project root configures auto-start.
+
+### Claude Code (manual)
 
 ```bash
 make install
@@ -14,13 +18,30 @@ This registers the server with Claude Code at user scope.
 
 ### Claude Desktop (MCPB Bundle)
 
-Build the MCP bundle:
+Build the MCP bundle from the project root:
 
 ```bash
-make build-mcpb
+make mcp-pack
 ```
 
-This creates `.claude/dist/ticker-cache-mcp-0.1.0.mcpb` which can be installed in Claude Desktop by double-clicking or dragging to the app.
+This creates `dist/ticker-cache-mcp-<version>.mcpb` which can be installed in Claude Desktop by double-clicking or dragging to the app.
+
+## Module Structure
+
+The server is decomposed into focused modules:
+
+| Module | Responsibility |
+|--------|---------------|
+| `app.py` | Shared instances (FastMCP, TickerCache, CLI args) |
+| `main.py` | Entry point, side-effect imports for registration |
+| `resources.py` | MCP resource handlers |
+| `tools.py` | MCP tool handlers |
+| `models.py` | Pydantic models (MarketData, MetricsData, TickerInfo) |
+| `cache.py` | TickerCache class and operation stats |
+| `constants.py` | URLs, paths, refresh policies |
+| `http_helpers.py` | HTTP fetch helpers (JSON, HTML) |
+| `yahoo.py` | Yahoo Finance API functions |
+| `scraping.py` | Wikipedia index scraping |
 
 ## Resources
 
@@ -78,6 +99,20 @@ make inspect
 make run
 ```
 
+Or from the project root:
+
+```bash
+make mcp-test       # Verify imports
+make mcp-run        # Run server
+make mcp-inspect    # Interactive inspector
+```
+
+### Running Tests
+
+```bash
+uv run --with pytest pytest tests/ -v
+```
+
 ## Remote Access (HTTP)
 
 The server supports HTTP transports for remote access:
@@ -105,6 +140,8 @@ The MCPB bundle uses `uv` for dependency management at runtime:
 2. `make pack` - Creates the `.mcpb` file
 
 Or run all steps: `make build-mcpb`
+
+From the project root: `make mcp-pack`
 
 ## Cleanup
 

@@ -46,7 +46,10 @@ inspect-http:
 
 # Inspect streamable-http server (run 'make run-streamable' first in another terminal)
 inspect-streamable:
-	npx @modelcontextprotocol/inspector --transport http --server-url http://localhost:8000/mcp
+	DANGEROUSLY_OMIT_AUTH=true npx @modelcontextprotocol/inspector --transport http --server-url https://stockpile-643c.onrender.com/mcp
+
+inspect-render-com:
+	DANGEROUSLY_OMIT_AUTH=true npx @modelcontextprotocol/inspector --transport http --server-url https://stockpile-643c.onrender.com/mcp --render-component
 
 # =============================================================================
 # MCPB Bundle (for Claude Desktop)

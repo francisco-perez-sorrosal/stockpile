@@ -1,0 +1,14 @@
+{
+  "name": "stockpile",
+  "version": "0.1.0",
+  "description": "Investment research skills and MCP servers for Claude -- ticker lookup, stock clustering, and market data caching",
+  "author": {
+    "name": "Francisco Perez-Sorrosal",
+    "email": "fperezsorrosal@gmail.com",
+    "url": "https://github.com/francisco-perez-sorrosal"
+  },
+  "repository": "https://github.com/francisco-perez-sorrosal/stockpile",
+  "license": "MIT",
+  "keywords": ["stocks", "ticker", "investment", "clustering", "yahoo-finance", "mcp"],
+  "skills": ["./skills/"]
+}

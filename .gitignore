@@ -2,8 +2,9 @@
 settings.local.json
 .claude/settings.local.json
 .claude/skills/.claude/settings.local.json
-.claude/dist/
 
+# Agent pipeline intermediates
+.ai-work/
 # Python
 __pycache__/
 *.py[cod]
@@ -33,7 +34,6 @@ env/
 .venv/
 
 # uv
-uv.lock
 
 # IDEs
 .vscode/

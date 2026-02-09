@@ -3,7 +3,7 @@
 
 Clusters stocks by annualized return and volatility to identify
 investment opportunities. Reads metrics from the shared ticker cache
-(populated by the ticker-cache MCP server).
+(populated by the ticker-cache MCP server) or from a JSON data file.
 
 This script focuses on analysis only - data fetching is done via MCP.
 """
@@ -20,6 +20,8 @@ from scipy.cluster.vq import kmeans, vq
 
 # Shared cache location (populated by ticker-cache MCP server)
 TICKER_CACHE_FILE = Path.home() / ".cache" / "ticker" / "tickers.json"
+
+METRICS_COLUMNS = ["Ticker", "Returns", "Volatility"]
 
 
 class StockMetrics(NamedTuple):
@@ -39,13 +41,13 @@ def read_metrics_from_cache(tickers: list[str] | None = None) -> pd.DataFrame:
         DataFrame with columns [Ticker, Returns, Volatility] for tickers that have metrics
     """
     if not TICKER_CACHE_FILE.exists():
-        return pd.DataFrame(columns=["Ticker", "Returns", "Volatility"])
+        return pd.DataFrame(columns=METRICS_COLUMNS)
 
     try:
         with open(TICKER_CACHE_FILE) as f:
             cache = json.load(f)
     except (json.JSONDecodeError, IOError):
-        return pd.DataFrame(columns=["Ticker", "Returns", "Volatility"])
+        return pd.DataFrame(columns=METRICS_COLUMNS)
 
     # If no tickers specified, use all cached
     if tickers is None:
@@ -90,6 +92,75 @@ def read_ticker_info_from_cache(tickers: list[str]) -> dict[str, dict]:
             }
 
     return result
+
+
+def read_metrics_from_file(
+    path: str, tickers: list[str] | None = None,
+) -> pd.DataFrame:
+    """Read returns and volatility from a JSON data file.
+
+    The JSON format matches the cache structure:
+    {"SYMBOL": {"metrics": {"annualized_return": ..., "annualized_volatility": ...}}, ...}
+
+    Also accepts the flat cache format:
+    {"SYMBOL": {"returns": ..., "volatility": ...}, ...}
+
+    Args:
+        path: File path to read. Use "-" to read from stdin.
+        tickers: List of ticker symbols to include. If None, reads all.
+
+    Returns:
+        DataFrame with columns [Ticker, Returns, Volatility] for tickers that have metrics.
+    """
+    try:
+        if path == "-":
+            data = json.load(sys.stdin)
+        else:
+            with open(path) as f:
+                data = json.load(f)
+    except (json.JSONDecodeError, IOError) as err:
+        print(f"Error reading data file: {err}", file=sys.stderr)
+        return pd.DataFrame(columns=METRICS_COLUMNS)
+
+    symbols = list(data.keys()) if tickers is None else tickers
+
+    rows = []
+    for symbol in symbols:
+        symbol_upper = symbol.upper()
+        entry = data.get(symbol_upper) or data.get(symbol)
+        if entry is None:
+            continue
+
+        returns, volatility = _extract_return_volatility(entry)
+        if returns is not None and volatility is not None:
+            rows.append({
+                "Ticker": symbol_upper,
+                "Returns": returns,
+                "Volatility": volatility,
+            })
+
+    return pd.DataFrame(rows, columns=METRICS_COLUMNS) if rows else pd.DataFrame(columns=METRICS_COLUMNS)
+
+
+def _extract_return_volatility(
+    entry: dict,
+) -> tuple[float | None, float | None]:
+    """Extract return and volatility from a ticker entry.
+
+    Supports two formats:
+    - Nested: {"metrics": {"annualized_return": ..., "annualized_volatility": ...}}
+    - Flat:   {"returns": ..., "volatility": ...}
+    """
+    metrics = entry.get("metrics", {})
+    if metrics:
+        returns = metrics.get("annualized_return")
+        volatility = metrics.get("annualized_volatility")
+        if returns is not None and volatility is not None:
+            return returns, volatility
+
+    returns = entry.get("returns")
+    volatility = entry.get("volatility")
+    return returns, volatility
 
 
 def find_elbow(data: np.ndarray, k_range: range) -> list[float]:
@@ -191,23 +262,13 @@ def plot_elbow(k_range: range, distortions: list[float], output: str | None = No
             print(f"  k={k}: {d:.2f}")
 
 
-def _ensure_plotly():
-    """Ensure plotly is installed, installing it if necessary."""
-    try:
-        import plotly.express as px
-        return px
-    except ImportError:
-        import subprocess
-        print("Installing plotly for interactive charts...", file=sys.stderr)
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "plotly"])
-        import plotly.express as px
-        return px
-
-
 def plot_clusters_interactive(clusters_df: pd.DataFrame, output: str | None = None):
-    """Create interactive scatter plot with Plotly."""
+    """Create interactive scatter plot with Plotly.
+
+    Returns True if the plot was created, False if plotly is not available.
+    """
     try:
-        px = _ensure_plotly()
+        import plotly.express as px
 
         color_col = "ClusterLabel" if "ClusterLabel" in clusters_df.columns else "Cluster"
 
@@ -382,6 +443,10 @@ def main() -> int:
         help="Comma-separated list of ticker symbols (e.g., 'AAPL,MSFT,GOOGL')",
     )
     parser.add_argument(
+        "--data-file", "-d",
+        help="Read ticker data from JSON file instead of cache. Use '-' for stdin.",
+    )
+    parser.add_argument(
         "--index", "-i",
         help="Deprecated: use MCP lookup('index_name') to get tickers first",
     )
@@ -404,15 +469,22 @@ def main() -> int:
         if verbose:
             print(f"Using tickers: {', '.join(tickers[:5])}{'...' if len(tickers) > 5 else ''}", file=sys.stderr)
 
-    # Read metrics from cache
-    if verbose:
-        print("Reading metrics from ticker cache...", file=sys.stderr)
-    metrics = read_metrics_from_cache(tickers)
+    # Read metrics: --data-file takes precedence over cache
+    if args.data_file:
+        if verbose:
+            source = "stdin" if args.data_file == "-" else args.data_file
+            print(f"Reading metrics from {source}...", file=sys.stderr)
+        metrics = read_metrics_from_file(args.data_file, tickers)
+    else:
+        if verbose:
+            print("Reading metrics from ticker cache...", file=sys.stderr)
+        metrics = read_metrics_from_cache(tickers)
 
     if metrics.empty:
         print(
-            "Error: No metrics found in cache. "
-            "Use MCP refresh_metrics() to calculate metrics first.",
+            "Error: No metrics found. "
+            "Use MCP refresh_metrics() to calculate metrics first, "
+            "or provide a --data-file.",
             file=sys.stderr
         )
         return 1

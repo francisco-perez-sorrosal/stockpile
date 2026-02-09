@@ -106,7 +106,7 @@ curl "https://query2.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=1
 
 ## Rate Limits
 
-Yahoo Finance does not publish official rate limits. The script includes:
+Yahoo Finance does not publish official rate limits. The MCP server includes:
 - 10-second timeout per request
 - User-Agent header to avoid 403 errors
 
@@ -114,7 +114,7 @@ For high-volume usage, consider adding delays between requests.
 
 ## Error Handling
 
-The script silently handles errors and returns `not_found` status. Common issues:
+The MCP server silently handles errors and returns `not_found` status. Common issues:
 
 - **403 Forbidden**: Missing or invalid User-Agent header
 - **Timeout**: Network issues or Yahoo rate limiting

@@ -1,87 +1,5 @@
 # Technical Reference
 
-## Yahoo Finance API
-
-The script uses Yahoo Finance's Chart API directly (no `yfinance` package required).
-
-### Chart Endpoint
-
-```
-GET https://query2.finance.yahoo.com/v8/finance/chart/{symbol}
-```
-
-**Parameters:**
-
-| Parameter | Description |
-|-----------|-------------|
-| `period1` | Start timestamp (Unix seconds) |
-| `period2` | End timestamp (Unix seconds) |
-| `interval` | Data interval: `1d`, `1wk`, `1mo` |
-
-**Example:**
-```bash
-curl "https://query2.finance.yahoo.com/v8/finance/chart/AAPL?period1=1704067200&period2=1735689600&interval=1d"
-```
-
-**Response structure:**
-```json
-{
-  "chart": {
-    "result": [{
-      "timestamp": [1704067200, 1704153600, ...],
-      "indicators": {
-        "quote": [{
-          "open": [...],
-          "high": [...],
-          "low": [...],
-          "close": [...],
-          "volume": [...]
-        }]
-      }
-    }]
-  }
-}
-```
-
-### Rate Limits and CDN Blocking
-
-Yahoo Finance uses aggressive CDN-level rate limiting. The "Edge: Too Many Requests" error indicates blocking at the CDN before reaching the API.
-
-**Root cause findings:**
-
-- Using `Accept-Encoding: gzip, deflate` headers can trigger more aggressive rate limiting
-- Minimal headers (just User-Agent) work more reliably
-- Rate limits reset after ~10-15 minutes of inactivity
-
-**Implemented mitigations:**
-
-| Strategy | Implementation |
-|----------|----------------|
-| Minimal headers | Only User-Agent header (no Accept-Encoding) |
-| Request delays | 0.5-1.5s randomized delay between requests |
-| Retry with backoff | 3 retries with exponential backoff (2x multiplier) |
-| Adaptive throttling | Doubles delay when >50% failure rate detected |
-
-**CLI options:**
-
-```bash
-# Increase delay for aggressive rate limiting
-python scripts/stock_clusters.py --delay 2.0
-
-# Test with fewer tickers first
-python scripts/stock_clusters.py --limit 50
-```
-
-**Symptoms of rate limiting:**
-- "Edge: Too Many Requests" error
-- HTTP 429 responses
-- High failure rate (>50%) during download
-
-**If rate limited:**
-1. Increase `--delay` to 2-3 seconds
-2. Wait 10-15 minutes before retrying
-3. Use `--limit` to process fewer tickers
-
 ## Return and Volatility Calculation
 
 ### Annualized Return
@@ -146,7 +64,7 @@ The first table contains current constituents with columns:
 ### Ticker Cleaning
 
 Some Wikipedia tickers need adjustment for Yahoo Finance:
-- Replace `.` with `-` (e.g., `BRK.B` → `BRK-B`)
+- Replace `.` with `-` (e.g., `BRK.B` -> `BRK-B`)
 - Remove whitespace and newlines
 
 ## Output Formats
@@ -203,3 +121,7 @@ MSFT,0.187,0.245,1
 - Volatility can indicate both risk and opportunity
 - High recent returns may indicate a stock is already overvalued
 - Always verify with fundamental analysis
+
+---
+
+Note: Yahoo Finance API documentation (rate limiting, endpoints, curl examples) was removed from this file. That content belongs with the `ticker-cache` MCP server, which handles all Yahoo Finance interactions.

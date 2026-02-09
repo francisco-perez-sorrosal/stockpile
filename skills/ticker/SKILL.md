@@ -1,6 +1,6 @@
 ---
-name: ticker
 description: Look up stock ticker symbols from company names using Yahoo Finance. Use when researching stocks, needing ticker symbols, validating tickers, or getting company details like sector and market cap.
+allowed-tools: [Read, Grep, Glob]
 ---
 
 Look up stock ticker symbols using the **ticker-cache MCP server**. All data access goes through MCP tools and resources.
@@ -54,7 +54,7 @@ Read-only views of cached data (no auto-fetching):
 
 ## Output Format
 
-All tools return JSON dict of symbol -> info:
+All tools return JSON dict of symbol -> info. The example below shows a subset of fields; actual responses include additional fields such as `market_cap`, `price`, and `volume`:
 
 ```json
 {

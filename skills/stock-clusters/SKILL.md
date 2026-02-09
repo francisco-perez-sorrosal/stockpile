@@ -1,5 +1,4 @@
 ---
-name: stock-clusters
 description: Analyze stock tickers by return and volatility using K-means clustering. Use when exploring investment opportunities, identifying risk profiles, comparing market segments, finding high-performers, or analyzing portfolio positioning.
 ---
 
@@ -50,15 +49,17 @@ This fetches 1-year price history and calculates annualized metrics.
 
 ### Step 3: Generate Elbow Curve
 
-Run the clustering script with `--elbow` to find optimal cluster count:
+Run the clustering script with `--elbow` to find optimal cluster count. All script paths are relative to the project root (`skills/stock-clusters/`).
 
 ```bash
-python scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,NVDA,META" --elbow --elbow-output elbow.png
+python skills/stock-clusters/scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,NVDA,META" --elbow --elbow-output elbow.png
 ```
 
-For index analysis:
+For index analysis, first get the tickers via MCP, then pass them to the script:
 ```bash
-python scripts/stock_clusters.py --index nasdaq100 --elbow --elbow-output elbow.png
+# 1. Use MCP to get index tickers: lookup("nasdaq100")
+# 2. Pass the resulting ticker list to the script:
+python skills/stock-clusters/scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,..." --elbow --elbow-output elbow.png
 ```
 
 ### Step 4: Analyze the Elbow Curve
@@ -78,7 +79,7 @@ Look for:
 ### Step 5: Run Clustering with Chosen k
 
 ```bash
-python scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,NVDA,META" --clusters <k> --output clusters.html
+python skills/stock-clusters/scripts/stock_clusters.py --tickers "AAPL,MSFT,GOOGL,NVDA,META" --clusters <k> --output clusters.html
 ```
 
 Replace `<k>` with the elbow value (e.g., `--clusters 3`).
@@ -116,15 +117,17 @@ Cluster labels are assigned automatically:
 
 ## Script Commands
 
+All paths are relative to the project root.
+
 | Task | Command |
 |------|---------|
-| Analyze custom tickers | `python scripts/stock_clusters.py -t "AAPL,MSFT,GOOGL"` |
-| Analyze with elbow | `python scripts/stock_clusters.py -t "..." --elbow --elbow-output elbow.png` |
-| Analyze from data file | `python scripts/stock_clusters.py --data-file /tmp/data.json -k 3` |
-| Analyze from stdin | `python scripts/stock_clusters.py --data-file - -k 3 < data.json` |
-| Set cluster count | `python scripts/stock_clusters.py -t "..." -k 4` |
-| Save interactive chart | `python scripts/stock_clusters.py -t "..." -o clusters.html` |
-| Export to CSV | `python scripts/stock_clusters.py -t "..." --csv results.csv` |
+| Analyze custom tickers | `python skills/stock-clusters/scripts/stock_clusters.py -t "AAPL,MSFT,GOOGL"` |
+| Analyze with elbow | `python skills/stock-clusters/scripts/stock_clusters.py -t "..." --elbow --elbow-output elbow.png` |
+| Analyze from data file | `python skills/stock-clusters/scripts/stock_clusters.py --data-file /tmp/data.json -k 3` |
+| Analyze from stdin | `python skills/stock-clusters/scripts/stock_clusters.py --data-file - -k 3 < data.json` |
+| Set cluster count | `python skills/stock-clusters/scripts/stock_clusters.py -t "..." -k 4` |
+| Save interactive chart | `python skills/stock-clusters/scripts/stock_clusters.py -t "..." -o clusters.html` |
+| Export to CSV | `python skills/stock-clusters/scripts/stock_clusters.py -t "..." --csv results.csv` |
 
 ## Output Formats
 
@@ -180,10 +183,10 @@ The `--data-file` flag allows clustering from a JSON file instead of the shared 
 
 ```bash
 # Save MCP lookup response to a file, then cluster from it
-python scripts/stock_clusters.py --data-file /tmp/nasdaq100_data.json -k 5 -o clusters.html
+python skills/stock-clusters/scripts/stock_clusters.py --data-file /tmp/nasdaq100_data.json -k 5 -o clusters.html
 
 # Read from stdin
-cat data.json | python scripts/stock_clusters.py --data-file - -k 3
+cat data.json | python skills/stock-clusters/scripts/stock_clusters.py --data-file - -k 3
 ```
 
 The JSON format matches the cache structure:
@@ -202,10 +205,10 @@ When `--data-file` is provided, it takes precedence over the cache.
 - The `ticker-cache` MCP server provides `lookup()` and `refresh_metrics()` tools
 - No manual installation needed -- `.mcp.json` at the plugin root handles auto-start
 
-**Python packages** (pre-installed in Claude environments):
+**Python packages** (pre-installed in claude.ai sandbox; local Claude Code environments may require manual installation):
 - pandas, numpy, scipy, matplotlib
 - plotly (optional -- falls back to matplotlib for static charts)
 
 ## See Also
 
-- `/ticker` - Look up ticker symbols and company details
+- `/stockpile:ticker` - Look up ticker symbols and company details

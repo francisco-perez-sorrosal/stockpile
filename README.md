@@ -13,6 +13,10 @@ cd stockpile
 
 **As a personal plugin** (available across projects):
 ```bash
+# 1. Add the bit-agora marketplace
+claude plugin marketplace add francisco-perez-sorrosal/bit-agora
+
+# 2. Install the plugin
 claude plugin install stockpile
 ```
 
@@ -40,7 +44,7 @@ Cluster NASDAQ-100 stocks by return and volatility
 
 ## Plugin Structure
 
-Stockpile uses the Claude Code plugin format. The `.claude-plugin/plugin.json` manifest declares the plugin identity. When the plugin is active:
+Stockpile uses the Claude Code plugin format. The `.claude-plugin/plugin.json` manifest declares the plugin identity. The plugin is distributed via the [bit-agora](https://github.com/francisco-perez-sorrosal/bit-agora) marketplace. When the plugin is active:
 
 - Skills at `skills/` are auto-discovered as `/stockpile:ticker` and `/stockpile:stock-clusters`
 - The MCP server at `mcp/ticker-cache/` auto-starts via `.mcp.json`

@@ -9,7 +9,7 @@ Skills and MCP servers for investment research with Claude, packaged as a Claude
 Stockpile is a Claude Code plugin. The `.claude-plugin/plugin.json` manifest declares the plugin identity, and Claude Code auto-discovers skills and the MCP server when the plugin is active.
 
 - **Project-scope**: clone the repo and skills + MCP server are available automatically
-- **Personal install**: `claude plugin install stockpile` makes it available across projects
+- **Personal install**: add the marketplace first (`claude plugin marketplace add francisco-perez-sorrosal/bit-agora`), then `claude plugin install stockpile`
 - Skills are namespaced as `/stockpile:ticker` and `/stockpile:stock-clusters`
 
 ## Architecture
@@ -130,8 +130,10 @@ Cluster stocks by return/volatility using K-means. Orchestrates MCP data access 
 │       ├── Makefile            # Server-level build targets
 │       └── README.md
 ├── dist/                       # Built artifacts (gitignored)
+├── install.sh                  # Interactive installer (code/desktop)
 ├── CLAUDE.md                   # Project instructions (this file)
 ├── README.md                   # User documentation
+├── README_DEV.md               # Development guide
 ├── Makefile                    # Root build targets
 ├── pyproject.toml              # uv workspace root
 ├── uv.lock                     # Workspace lockfile
@@ -140,14 +142,31 @@ Cluster stocks by return/volatility using K-means. Orchestrates MCP data access 
     └── settings.local.json     # Claude Code local settings
 ```
 
+## Installation
+
+Interactive installer for both Claude Code and Claude Desktop:
+
+```bash
+./install.sh              # Claude Code (default)
+./install.sh desktop      # Claude Desktop
+./install.sh --uninstall  # Remove
+```
+
+Or via Makefile: `make install`, `make install-desktop`, `make uninstall`, `make uninstall-desktop`.
+
 ## Build System
 
 The root `Makefile` consolidates all build targets:
 
 ```bash
+# Installation
+make install                              # Interactive install (Claude Code)
+make install-desktop                      # Interactive install (Claude Desktop)
+make uninstall                            # Interactive uninstall (Claude Code)
+make uninstall-desktop                    # Interactive uninstall (Claude Desktop)
+
 # Skills
 make SKILL=stock-clusters skill-build     # Build skill ZIP to dist/
-make SKILL=stock-clusters skill-install   # Install to ~/.claude/skills/
 
 # MCP Server
 make mcp-test                             # Verify server imports
@@ -159,28 +178,6 @@ make mcp-pack                             # Build MCPB bundle to dist/
 make clean                                # Remove dist/
 ```
 
-## Adding a New Skill
+## Development
 
-1. Create directory: `skills/<skill_name>/`
-2. Create `SKILL.md` with YAML frontmatter (`name`, `description`)
-3. Add `scripts/` for computation (if needed)
-4. Reference MCP tools/resources for data access
-5. Build and install: `make SKILL=<skill_name> skill-build && make SKILL=<skill_name> skill-install`
-
-The skill is auto-discovered as `/stockpile:<skill_name>` when the plugin is active.
-
-## Skill Dependency Management
-
-Skills externalize dependency management -- no `requirements.txt` in skill packages.
-
-| Environment | How Dependencies Work |
-|-------------|----------------------|
-| **Claude API** | 184+ pre-installed packages only |
-| **Claude Code** | Auto-runs `pip install` on import error |
-| **Claude.ai** | Platform-managed packages |
-
-**Best practices:**
-1. Use pre-installed packages (pandas, numpy, scipy, matplotlib)
-2. Prefer Python standard library for portability
-3. Document dependencies in SKILL.md
-4. Use MCP for external API access (not direct HTTP in skills)
+See `README_DEV.md` for development setup, skill/MCP server development, and build artifacts.

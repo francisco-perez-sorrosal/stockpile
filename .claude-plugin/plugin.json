@@ -10,5 +10,11 @@
   "repository": "https://github.com/francisco-perez-sorrosal/stockpile",
   "license": "MIT",
   "keywords": ["stocks", "ticker", "investment", "clustering", "yahoo-finance", "mcp"],
+  "mcpServers": {
+    "ticker-cache": {
+      "command": "uv",
+      "args": ["--directory", "${CLAUDE_PLUGIN_ROOT}/mcp/ticker-cache", "run", "main.py"]
+    }
+  },
   "skills": ["./skills/"]
 }
